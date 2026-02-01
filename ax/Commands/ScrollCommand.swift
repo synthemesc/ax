@@ -20,18 +20,15 @@ struct ScrollCommand {
         // Determine scroll position
         let point: CGPoint
 
-        if let position = args.position {
-            point = CGPoint(x: position.x, y: position.y)
-        } else if let target = args.target {
-            // Get element center
-            guard let axElement = ElementRegistry.shared.lookup(target) else {
-                Output.error(.notFound("Element \(target) not found"))
+        if let address = args.address {
+            do {
+                let resolved = try AddressResolver.resolvePoint(address)
+                point = resolved.cgPoint
+            } catch let error as AXError {
+                Output.error(error)
+            } catch {
+                Output.error(.actionFailed(error.localizedDescription))
             }
-            let element = Element(axElement)
-            guard let frame = element.frame else {
-                Output.error(.actionFailed("Element has no position"))
-            }
-            point = CGPoint(x: frame.midX, y: frame.midY)
         } else {
             // Use current mouse position
             point = MouseEvents.currentPosition

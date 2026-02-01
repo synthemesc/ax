@@ -15,11 +15,24 @@ struct FocusCommand {
     }
 
     static func run(args: CommandParser.FocusArgs) {
-        // Check if target is a PID (numeric) or element ID (hex)
-        if let pid = Int32(args.target) {
-            focusApp(pid: pid)
-        } else {
-            focusElement(id: args.target)
+        do {
+            switch args.address {
+            case .pid(let pid):
+                focusApp(pid: pid)
+
+            case .element, .elementRect, .elementOffset, .elementOffsetRect:
+                let element = try AddressResolver.resolveElement(args.address)
+                focusElement(element: element)
+
+            case .absolutePoint, .absoluteRect:
+                // Focus element at coordinates
+                let element = try AddressResolver.resolveElement(args.address)
+                focusElement(element: element)
+            }
+        } catch let error as AXError {
+            Output.error(error)
+        } catch {
+            Output.error(.actionFailed(error.localizedDescription))
         }
     }
 
@@ -37,13 +50,9 @@ struct FocusCommand {
         Output.json(FocusResult(focused: "pid:\(pid)"))
     }
 
-    /// Focus an element by ID
-    private static func focusElement(id: String) {
-        guard let axElement = ElementRegistry.shared.lookup(id) else {
-            Output.error(.notFound("Element \(id) not found"))
-        }
-
-        let element = Element(axElement)
+    /// Focus an element
+    private static func focusElement(element: Element) {
+        let id = element.id
 
         // Try to set focus attribute
         do {

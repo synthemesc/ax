@@ -107,6 +107,30 @@ struct ScreenCapture {
         return image
     }
 
+    /// Capture a rectangular region of the screen
+    /// - Parameter rect: The rect in screen coordinates
+    static func captureRect(_ rect: CGRect) async throws -> CGImage {
+        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+
+        guard let display = content.displays.first else {
+            throw AXError.actionFailed("No displays found")
+        }
+
+        let filter = SCContentFilter(display: display, excludingWindows: [])
+        let config = SCStreamConfiguration()
+        config.sourceRect = rect
+        config.width = Int(rect.width) * 2   // Retina
+        config.height = Int(rect.height) * 2
+        config.showsCursor = false
+
+        let image = try await SCScreenshotManager.captureImage(
+            contentFilter: filter,
+            configuration: config
+        )
+
+        return image
+    }
+
     /// Capture an element by cropping to its frame
     /// - Parameters:
     ///   - frame: The element's frame in screen coordinates

@@ -5,17 +5,16 @@
 //  Manual command-line argument parser (no ArgumentParser dependency).
 //
 //  Command Format:
-//    ax <command> [positional args] [--flags]
+//    ax <command> [address] [additional args] [--flags]
 //
-//  Argument Patterns:
-//    ax ls                       # No args
-//    ax ls 1234                  # Positional: PID or element ID
-//    ax ls 1234 --depth 3        # Positional + flag with value
-//    ax click --pos 100,200      # Flag-only (position as x,y)
-//    ax type "hello"             # Positional: text to type
-//    ax type 0x123 "hello"       # Two positionals: target + text
-//
-//  Position Format: x,y (comma-separated integers, no spaces)
+//  Address Formats:
+//    @x,y                    Absolute screen point
+//    @x,y+WxH                Absolute screen rect
+//    pid:hash                Element by ID
+//    pid:hash+WxH            Rect from element's origin
+//    pid:hash@dx,dy          Point offset from element
+//    pid:hash@dx,dy+WxH      Rect offset from element
+//    pid                     Application by PID
 //
 //  All parsing errors throw AXError.invalidArguments for consistent
 //  error handling and exit code 4.
@@ -38,6 +37,14 @@ struct CommandParser {
         case focus(FocusArgs)
         case launch(LaunchArgs)
         case quit(QuitArgs)
+        // New commands
+        case cursor
+        case focused
+        case selection(SelectionArgs)
+        case set(SetArgs)
+        case move(MoveArgs)
+        case resize(ResizeArgs)
+        case drag(DragArgs)
     }
 
     struct HelpArgs {
@@ -46,19 +53,18 @@ struct CommandParser {
     }
 
     struct ListArgs {
-        var target: String?      // pid or element id
+        var address: Address?    // pid, element, point, or rect
         var depth: Int?          // --depth N
         var screenshot: String?  // --screenshot path
         var screenshotBase64: Bool = false  // --screenshot-base64
     }
 
     struct ClickArgs {
-        var target: String?      // element id
-        var position: (x: Int, y: Int)?  // --pos x,y
+        var address: Address?    // element or point
     }
 
     struct TypeArgs {
-        var target: String?      // element id (optional)
+        var address: Address?    // element (optional)
         var text: String         // text to type
     }
 
@@ -68,19 +74,18 @@ struct CommandParser {
     }
 
     struct ScrollArgs {
-        var target: String?      // element id
-        var position: (x: Int, y: Int)?  // --pos x,y
+        var address: Address?    // element or point
         var direction: String    // up, down, left, right
         var amount: Int          // pixels
     }
 
     struct ActionArgs {
-        var target: String       // element id
+        var address: Address     // element
         var action: String       // action name
     }
 
     struct FocusArgs {
-        var target: String       // pid or element id
+        var address: Address     // pid or element
     }
 
     struct LaunchArgs {
@@ -89,6 +94,33 @@ struct CommandParser {
 
     struct QuitArgs {
         var pid: Int32           // process id
+    }
+
+    // New command args
+
+    struct SelectionArgs {
+        var address: Address     // element
+    }
+
+    struct SetArgs {
+        var address: Address     // element
+        var value: String        // value to set
+    }
+
+    struct MoveArgs {
+        var address: Address     // element to move
+        var destination: Address // --to target position
+    }
+
+    struct ResizeArgs {
+        var address: Address     // element to resize
+        var width: Int           // target width
+        var height: Int          // target height
+    }
+
+    struct DragArgs {
+        var from: Address        // start position
+        var to: Address          // --to end position
     }
 
     /// Parse command line arguments
@@ -135,6 +167,28 @@ struct CommandParser {
 
         case "quit":
             return try .quit(parseQuitArgs(args))
+
+        // New commands
+        case "cursor":
+            return .cursor
+
+        case "focused":
+            return .focused
+
+        case "selection":
+            return try .selection(parseSelectionArgs(args))
+
+        case "set":
+            return try .set(parseSetArgs(args))
+
+        case "move":
+            return try .move(parseMoveArgs(args))
+
+        case "resize":
+            return try .resize(parseResizeArgs(args))
+
+        case "drag":
+            return try .drag(parseDragArgs(args))
 
         default:
             throw AXError.invalidArguments("Unknown command: \(commandName)")
@@ -186,7 +240,7 @@ struct CommandParser {
             } else if arg == "--screenshot-base64" {
                 result.screenshotBase64 = true
             } else if !arg.hasPrefix("-") {
-                result.target = arg
+                result.address = try AddressParser.parse(arg)
             } else {
                 throw AXError.invalidArguments("Unknown option: \(arg)")
             }
@@ -205,13 +259,15 @@ struct CommandParser {
             let arg = args[i]
 
             if arg == "--pos" || arg == "-p" {
+                // Legacy support: --pos x,y
                 i += 1
                 guard i < args.count else {
                     throw AXError.invalidArguments("--pos requires x,y coordinates")
                 }
-                result.position = try parsePosition(args[i])
+                // Convert --pos x,y to @x,y address
+                result.address = try AddressParser.parse("@" + args[i])
             } else if !arg.hasPrefix("-") {
-                result.target = arg
+                result.address = try AddressParser.parse(arg)
             } else {
                 throw AXError.invalidArguments("Unknown option: \(arg)")
             }
@@ -228,11 +284,12 @@ struct CommandParser {
         }
 
         // If there's one arg, it's the text
-        // If there are two args, first is target, second is text
+        // If there are two args, first is address, second is text
         if args.count == 1 {
-            return TypeArgs(target: nil, text: args[0])
+            return TypeArgs(address: nil, text: args[0])
         } else {
-            return TypeArgs(target: args[0], text: args[1])
+            let address = try AddressParser.parse(args[0])
+            return TypeArgs(address: address, text: args[1])
         }
     }
 
@@ -267,8 +324,7 @@ struct CommandParser {
     }
 
     private static func parseScrollArgs(_ args: [String]) throws -> ScrollArgs {
-        var target: String?
-        var position: (x: Int, y: Int)?
+        var address: Address?
         var direction: String?
         var amount: Int?
         var i = 0
@@ -277,19 +333,22 @@ struct CommandParser {
             let arg = args[i]
 
             if arg == "--pos" || arg == "-p" {
+                // Legacy support: --pos x,y
                 i += 1
                 guard i < args.count else {
                     throw AXError.invalidArguments("--pos requires x,y coordinates")
                 }
-                position = try parsePosition(args[i])
+                address = try AddressParser.parse("@" + args[i])
             } else if !arg.hasPrefix("-") {
-                // Could be target, direction, or amount
+                // Could be address, direction, or amount
                 if ["up", "down", "left", "right"].contains(arg.lowercased()) {
                     direction = arg.lowercased()
-                } else if let num = Int(arg) {
+                } else if let num = Int(arg), address != nil || direction != nil {
+                    // Only treat as amount if we already have address or direction
                     amount = num
                 } else {
-                    target = arg
+                    // Try to parse as address
+                    address = try AddressParser.parse(arg)
                 }
             } else {
                 throw AXError.invalidArguments("Unknown option: \(arg)")
@@ -305,23 +364,25 @@ struct CommandParser {
             throw AXError.invalidArguments("scroll requires an amount")
         }
 
-        return ScrollArgs(target: target, position: position, direction: dir, amount: amt)
+        return ScrollArgs(address: address, direction: dir, amount: amt)
     }
 
     private static func parseActionArgs(_ args: [String]) throws -> ActionArgs {
         guard args.count >= 2 else {
-            throw AXError.invalidArguments("action requires element id and action name")
+            throw AXError.invalidArguments("action requires element address and action name")
         }
 
-        return ActionArgs(target: args[0], action: args[1])
+        let address = try AddressParser.parse(args[0])
+        return ActionArgs(address: address, action: args[1])
     }
 
     private static func parseFocusArgs(_ args: [String]) throws -> FocusArgs {
         guard let target = args.first else {
-            throw AXError.invalidArguments("focus requires a pid or element id")
+            throw AXError.invalidArguments("focus requires a pid or element address")
         }
 
-        return FocusArgs(target: target)
+        let address = try AddressParser.parse(target)
+        return FocusArgs(address: address)
     }
 
     private static func parseLaunchArgs(_ args: [String]) throws -> LaunchArgs {
@@ -340,15 +401,140 @@ struct CommandParser {
         return QuitArgs(pid: pid)
     }
 
+    // MARK: - New Command Parsers
+
+    private static func parseSelectionArgs(_ args: [String]) throws -> SelectionArgs {
+        guard let target = args.first else {
+            throw AXError.invalidArguments("selection requires an element address")
+        }
+
+        let address = try AddressParser.parse(target)
+        return SelectionArgs(address: address)
+    }
+
+    private static func parseSetArgs(_ args: [String]) throws -> SetArgs {
+        guard args.count >= 2 else {
+            throw AXError.invalidArguments("set requires element address and value")
+        }
+
+        let address = try AddressParser.parse(args[0])
+        return SetArgs(address: address, value: args[1])
+    }
+
+    private static func parseMoveArgs(_ args: [String]) throws -> MoveArgs {
+        var address: Address?
+        var destination: Address?
+        var i = 0
+
+        while i < args.count {
+            let arg = args[i]
+
+            if arg == "--to" || arg == "-t" {
+                i += 1
+                guard i < args.count else {
+                    throw AXError.invalidArguments("--to requires a destination address")
+                }
+                destination = try AddressParser.parse(args[i])
+            } else if !arg.hasPrefix("-") {
+                address = try AddressParser.parse(arg)
+            } else {
+                throw AXError.invalidArguments("Unknown option: \(arg)")
+            }
+
+            i += 1
+        }
+
+        guard let addr = address else {
+            throw AXError.invalidArguments("move requires an element address")
+        }
+        guard let dest = destination else {
+            throw AXError.invalidArguments("move requires --to destination")
+        }
+
+        return MoveArgs(address: addr, destination: dest)
+    }
+
+    private static func parseResizeArgs(_ args: [String]) throws -> ResizeArgs {
+        var address: Address?
+        var size: (width: Int, height: Int)?
+        var i = 0
+
+        while i < args.count {
+            let arg = args[i]
+
+            if arg == "--to" || arg == "-t" {
+                i += 1
+                guard i < args.count else {
+                    throw AXError.invalidArguments("--to requires a size (WxH)")
+                }
+                size = try parseSize(args[i])
+            } else if !arg.hasPrefix("-") {
+                // Could be address or size
+                if arg.lowercased().contains("x") && !arg.contains(":") && !arg.hasPrefix("@") {
+                    size = try parseSize(arg)
+                } else {
+                    address = try AddressParser.parse(arg)
+                }
+            } else {
+                throw AXError.invalidArguments("Unknown option: \(arg)")
+            }
+
+            i += 1
+        }
+
+        guard let addr = address else {
+            throw AXError.invalidArguments("resize requires an element address")
+        }
+        guard let sz = size else {
+            throw AXError.invalidArguments("resize requires a size (WxH or --to WxH)")
+        }
+
+        return ResizeArgs(address: addr, width: sz.width, height: sz.height)
+    }
+
+    private static func parseDragArgs(_ args: [String]) throws -> DragArgs {
+        var from: Address?
+        var to: Address?
+        var i = 0
+
+        while i < args.count {
+            let arg = args[i]
+
+            if arg == "--to" || arg == "-t" {
+                i += 1
+                guard i < args.count else {
+                    throw AXError.invalidArguments("--to requires a destination address")
+                }
+                to = try AddressParser.parse(args[i])
+            } else if !arg.hasPrefix("-") {
+                from = try AddressParser.parse(arg)
+            } else {
+                throw AXError.invalidArguments("Unknown option: \(arg)")
+            }
+
+            i += 1
+        }
+
+        guard let fromAddr = from else {
+            throw AXError.invalidArguments("drag requires a start address")
+        }
+        guard let toAddr = to else {
+            throw AXError.invalidArguments("drag requires --to destination")
+        }
+
+        return DragArgs(from: fromAddr, to: toAddr)
+    }
+
     // MARK: - Helpers
 
-    private static func parsePosition(_ str: String) throws -> (x: Int, y: Int) {
-        let parts = str.split(separator: ",")
+    private static func parseSize(_ str: String) throws -> (width: Int, height: Int) {
+        let lowercased = str.lowercased()
+        let parts = lowercased.split(separator: "x")
         guard parts.count == 2,
-              let x = Int(parts[0].trimmingCharacters(in: .whitespaces)),
-              let y = Int(parts[1].trimmingCharacters(in: .whitespaces)) else {
-            throw AXError.invalidArguments("Invalid position format. Use: x,y")
+              let w = Int(parts[0].trimmingCharacters(in: .whitespaces)),
+              let h = Int(parts[1].trimmingCharacters(in: .whitespaces)) else {
+            throw AXError.invalidArguments("Invalid size format: \(str). Use: WxH (e.g., 800x600)")
         }
-        return (x, y)
+        return (w, h)
     }
 }

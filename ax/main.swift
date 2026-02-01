@@ -32,48 +32,63 @@ let helpText = """
 ax - macOS Accessibility CLI
 
 USAGE:
-    ax <command> [options]
+    ax <command> [address] [options]
+
+ADDRESS FORMATS:
+    @x,y                    Absolute screen point
+    @x,y+WxH                Absolute screen rect
+    pid                     Application by PID
+    pid:hash                Element by ID
+    pid:hash+WxH            Rect from element's origin
+    pid:hash@dx,dy          Point offset from element
+    pid:hash@dx,dy+WxH      Rect offset from element
 
 COMMANDS:
-    ls                      List running applications
+    ls                      List running applications and displays
     ls <pid>                List windows for an application
-    ls <id>                 Show element tree starting from element
-    ls <id> --depth <n>     Limit tree depth
+    ls <pid:hash>           Show element tree starting from element
+    ls @x,y                 Show element at screen coordinates
+    ls @x,y+WxH             Show elements within screen rect
 
-    click <id>              Click an element (uses AXPress or center click)
-    click --pos x,y         Click at screen coordinates
-
-    rightclick <id>         Right-click an element
-    rightclick --pos x,y    Right-click at screen coordinates
+    click <address>         Click at element or coordinates
+    rightclick <address>    Right-click at element or coordinates
 
     type "text"             Type text into focused element
-    type <id> "text"        Focus element and type text
+    type <address> "text"   Focus element and type text
 
     key <combo>             Press key combination (e.g., cmd+shift+s)
     key <combo> --repeat n  Repeat key press n times
 
-    scroll <id> <dir> <amt> Scroll element (dir: up/down/left/right)
-    scroll --pos x,y <dir> <amt>
+    scroll <address> <dir> <amt>  Scroll at position (dir: up/down/left/right)
 
-    action <id> <action>    Perform accessibility action on element
+    action <address> <action>     Perform accessibility action on element
 
     focus <pid>             Activate application
-    focus <id>              Focus element
+    focus <address>         Focus element
+
+    cursor                  Get current mouse position
+    focused                 Get currently focused element
+    selection <address>     Get selected text from element
+
+    set <address> "value"   Set element's value
+    move <address> --to @x,y      Move window/element to position
+    resize <address> WxH          Resize window/element
+
+    drag <address> --to <address> Drag from one position to another
 
     launch <bundle-id>      Launch application by bundle identifier
-
     quit <pid>              Quit application by process id
 
     help                    Show this help
-    help roles              List accessibility roles (button, window, etc.)
-    help actions            List accessibility actions (press, show_menu, etc.)
-    help attributes         Explain output fields (id, role, value, etc.)
+    help roles              List accessibility roles
+    help actions            List accessibility actions
+    help attributes         Explain output fields
     help keys               List key names for ax key command
     help --json             Machine-readable documentation
 
 OPTIONS:
     --depth, -d <n>         Limit tree traversal depth
-    --pos, -p <x,y>         Screen coordinates
+    --to, -t <address>      Destination for move/drag commands
     --repeat, -r <n>        Repeat count for key presses
     --screenshot <path>     Save screenshot to file (with ls)
     --screenshot-base64     Include screenshot as base64 in JSON (with ls)
@@ -87,18 +102,26 @@ EXIT CODES:
     4   Invalid arguments
 
 ELEMENT IDs:
-    IDs have format: <pid>-<hash> (e.g., 619-1668249066)
+    IDs have format: <pid>:<hash> (e.g., 619:1668249066)
     IDs are stable across invocations while the app is running.
 
 EXAMPLES:
-    ax ls                           # List all apps
+    ax ls                           # List all apps and displays
     ax ls 1234                      # List windows for app with pid 1234
-    ax ls 1234-5678901              # Show element tree from element ID
-    ax ls 1234 --depth 3            # Show windows with 3 levels of children
-    ax click 1234-5678901           # Click element by ID
-    ax click --pos 100,200          # Click at coordinates
+    ax ls 1234:5678901              # Show element tree from element ID
+    ax ls @500,300                  # Show element at screen coordinates
+    ax click 1234:5678901           # Click element by ID
+    ax click @100,200               # Click at screen coordinates
+    ax click 1234:5678901@50,50     # Click at offset from element
     ax type "Hello, world!"         # Type into focused element
     ax key cmd+s                    # Press Cmd+S
+    ax cursor                       # Get mouse position
+    ax focused                      # Get focused element
+    ax selection 1234:5678901       # Get selected text
+    ax set 1234:5678901 "new text"  # Set element value
+    ax move 1234:5678901 --to @100,100  # Move window
+    ax resize 1234:5678901 800x600  # Resize window
+    ax drag @100,200 --to @300,400  # Drag from one point to another
     ax launch com.apple.Safari      # Launch Safari
 """
 
@@ -157,6 +180,34 @@ func main() {
 
         case .quit(let args):
             QuitCommand.run(args: args)
+
+        // New commands
+        case .cursor:
+            CursorCommand.run()
+
+        case .focused:
+            checkAccessibilityPermission()
+            FocusedCommand.run()
+
+        case .selection(let args):
+            checkAccessibilityPermission()
+            SelectionCommand.run(args: args)
+
+        case .set(let args):
+            checkAccessibilityPermission()
+            SetCommand.run(args: args)
+
+        case .move(let args):
+            checkAccessibilityPermission()
+            MoveCommand.run(args: args)
+
+        case .resize(let args):
+            checkAccessibilityPermission()
+            ResizeCommand.run(args: args)
+
+        case .drag(let args):
+            checkAccessibilityPermission()
+            DragCommand.run(args: args)
         }
     } catch let error as AXError {
         Output.error(error)

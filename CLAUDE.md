@@ -21,14 +21,42 @@ xcodebuild build -scheme ax -configuration Debug
 ax ls                        # List displays + apps
 ax ls <pid>                  # List windows (includes display ID)
 ax ls <pid> --depth 3        # Element tree
-ax ls <pid>-<hash>           # Lookup element by ID
-ax click <pid>-<hash>        # Click element
-ax click --pos x,y           # Click coordinates
+ax ls <pid>:<hash>           # Lookup element by ID
+ax ls @500,300               # Element at screen coordinates
+ax click <pid>:<hash>        # Click element
+ax click @100,200            # Click at absolute coordinates
+ax click <pid>:<hash>@50,50  # Click at offset from element
 ax type "text"               # Type into focused element
 ax key cmd+s                 # Key combo
+ax cursor                    # Get mouse position
+ax focused                   # Get focused element
+ax selection <id>            # Get selected text
+ax set <id> "new value"      # Set element value
+ax move <id> --to @100,100   # Move window
+ax resize <id> 800x600       # Resize window
+ax drag @100,200 --to @300,400  # Drag operation
 ax launch com.apple.Safari   # Launch app
 ax quit <pid>                # Quit app
 ```
+
+## Address Formats
+
+Universal addressing system for targeting points, rects, and elements:
+
+| Format | Example | Meaning |
+|--------|---------|---------|
+| `@x,y` | `@500,300` | Absolute screen point |
+| `@x,y+WxH` | `@100,200+400x300` | Absolute screen rect |
+| `pid` | `1234` | Application by PID |
+| `pid:hash` | `1234:5678901` | Element by ID |
+| `pid:hash+WxH` | `1234:5678901+400x300` | Rect from element origin |
+| `pid:hash@dx,dy` | `1234:5678901@50,50` | Point offset from element |
+| `pid:hash@dx,dy+WxH` | `1234:5678901@50,50+400x300` | Rect offset from element |
+
+Operators:
+- `@` prefix = absolute screen coordinates (or offset when after element)
+- `:` = separates PID from element hash
+- `+WxH` = extends a point into a rect with specified size
 
 ## Build Commands
 
@@ -53,23 +81,31 @@ The built executable is located in the derived data directory:
 ```bash
 # List displays and running applications
 ax ls
-# → {"displays": [{"id": 1, "x": 0, "y": 0, "width": 2560, "height": 1600, "scale": 2, "main": true}, ...],
-#    "apps": [{"pid": 1234, "name": "Safari", "bundle_id": "com.apple.Safari"}, ...]}
+# → {"displays": [...], "apps": [{"pid": 1234, "name": "Safari", "bundle_id": "com.apple.Safari"}, ...]}
 
 # List windows for an app (by PID) - includes which display each window is on
 ax ls 1234
 # → [{"id": "1234:567891234", "title": "GitHub", "frame": {...}, "display": 1}, ...]
 
-# Show element tree with depth limit
+# Show element tree with depth limit (includes "origin" for absolute position)
 ax ls 1234 --depth 3
+
+# Show element at screen coordinates
+ax ls @500,300
+
+# Show elements within a screen rect
+ax ls @100,200+400x300
 
 # Take screenshot
 ax ls --screenshot /tmp/screen.png
 ax ls 1234 --screenshot-base64
 
-# Click at position or element
-ax click --pos 100,200
-ax click 0x7f8a2c
+# Click at absolute coordinates or element
+ax click @100,200
+ax click 1234:5678901
+
+# Click at offset from element (50px right, 50px down from element's top-left)
+ax click 1234:5678901@50,50
 
 # Type text
 ax type "Hello, world!"
@@ -79,14 +115,38 @@ ax key cmd+s
 ax key down --repeat 5
 
 # Scroll
-ax scroll up 100
-ax scroll --pos 500,500 down 200
+ax scroll @500,300 down 100
+ax scroll 1234:5678901 up 200
 
 # Perform accessibility action
-ax action 0x7f8a2c press
+ax action 1234:5678901 press
 
 # Focus app or element
 ax focus 1234
+
+# Get current mouse position
+ax cursor
+# → {"x": 500, "y": 300}
+
+# Get focused element
+ax focused
+
+# Get selected text from a text element
+ax selection 1234:5678901
+# → {"text": "selected words", "range": [10, 14]}
+
+# Set element value
+ax set 1234:5678901 "new text"
+
+# Move window to position
+ax move 1234:5678901 --to @100,100
+
+# Resize window
+ax resize 1234:5678901 800x600
+
+# Drag from one position to another
+ax drag @100,200 --to @300,400
+ax drag 1234:5678901@10,10 --to 1234:9876543@10,10
 
 # Launch/quit applications
 ax launch com.apple.Safari
@@ -113,6 +173,8 @@ ax/
 │   └── ElementInfo.swift   # Codable: id, role, title, value, actions, children
 ├── CLI/
 │   ├── CommandParser.swift # Manual argv parsing
+│   ├── Address.swift       # Universal address parser (@x,y, pid:hash, etc.)
+│   ├── AddressResolver.swift # Resolves addresses to points/elements
 │   └── Output.swift        # JSON to stdout, errors to stderr
 ├── Commands/
 │   ├── ListCommand.swift   # ax ls
@@ -122,6 +184,13 @@ ax/
 │   ├── ScrollCommand.swift # ax scroll
 │   ├── ActionCommand.swift # ax action
 │   ├── FocusCommand.swift  # ax focus
+│   ├── CursorCommand.swift # ax cursor
+│   ├── FocusedCommand.swift # ax focused
+│   ├── SelectionCommand.swift # ax selection
+│   ├── SetCommand.swift    # ax set
+│   ├── MoveCommand.swift   # ax move
+│   ├── ResizeCommand.swift # ax resize
+│   ├── DragCommand.swift   # ax drag
 │   ├── LaunchCommand.swift # ax launch
 │   └── QuitCommand.swift   # ax quit
 ├── Input/
@@ -142,7 +211,9 @@ ax/
 
 - **Frameworks:** ApplicationServices (AXUIElement), CoreGraphics (CGEvent), AppKit (NSWorkspace), ScreenCaptureKit, Carbon.HIToolbox (key codes)
 - **Permissions:** Requires Accessibility permission (`AXIsProcessTrusted()`) and Screen Recording for screenshots
-- **Element IDs:** Stable `pid-hash` format (e.g., `619-1668249066`) using CFHash - persists across invocations
+- **Element IDs:** Stable `pid:hash` format (e.g., `619:1668249066`) using CFHash - persists across invocations
+- **Universal Addressing:** Supports absolute coords (`@x,y`), element IDs (`pid:hash`), offsets (`pid:hash@dx,dy`), and rects (`+WxH`)
+- **Origin Field:** Elements include `origin` with absolute screen position for easy targeting
 - **JSON Output:** All commands output JSON to stdout, errors go to stderr
 
 ## Exit Codes
@@ -164,7 +235,7 @@ ax/
 
 ### Element IDs - Stable Across Invocations
 
-Element IDs use the format `<pid>-<hash>` (e.g., `619-1668249066`):
+Element IDs use the format `<pid>:<hash>` (e.g., `619:1668249066`):
 - **PID:** Identifies which application to search
 - **Hash:** CFHash of the AXUIElement, stable for the same underlying UI element
 
@@ -173,11 +244,11 @@ Element IDs use the format `<pid>-<hash>` (e.g., `619-1668249066`):
 ```bash
 # First invocation - get element IDs
 ax ls 619 --depth 3
-# Output includes: "id": "619-1668249066"
+# Output includes: "id": "619:1668249066"
 
 # Second invocation - use that ID
-ax click 619-1668249066   # Works!
-ax ls 619-1668249066      # Works!
+ax click 619:1668249066   # Works!
+ax ls 619:1668249066      # Works!
 ```
 
 **Lookup mechanism:** When given an ID, the system:
@@ -387,7 +458,7 @@ kAXIdentifierAttribute    // Developer-set identifier
 - Element may have been removed/recreated
 - Re-traverse tree to get fresh IDs
 
-### File Summary (30 Swift files)
+### File Summary (39 Swift files)
 
 | File | Purpose |
 |------|---------|
@@ -401,32 +472,104 @@ kAXIdentifierAttribute    // Developer-set identifier
 | `Models/AppInfo.swift` | App JSON model (pid, name, bundleId) |
 | `Models/DisplayInfo.swift` | Display JSON model + AppListResult wrapper |
 | `Models/WindowInfo.swift` | Window JSON model + FrameInfo + display ID |
-| `Models/ElementInfo.swift` | Element JSON model (recursive) |
+| `Models/ElementInfo.swift` | Element JSON model (recursive) + PointInfo |
 | `CLI/Output.swift` | JSON output, stderr errors |
-| `CLI/CommandParser.swift` | Manual argv parsing |
-| `Commands/ListCommand.swift` | `ax ls` - apps, windows, elements |
+| `CLI/CommandParser.swift` | Manual argv parsing with Address support |
+| `CLI/Address.swift` | Universal address types and parser |
+| `CLI/AddressResolver.swift` | Resolve addresses to points/rects/elements |
+| `Commands/ListCommand.swift` | `ax ls` - apps, windows, elements, point/rect queries |
 | `Commands/ClickCommand.swift` | `ax click` / `ax rightclick` |
 | `Commands/TypeCommand.swift` | `ax type` - Unicode text input |
 | `Commands/KeyCommand.swift` | `ax key` - key combos |
 | `Commands/ScrollCommand.swift` | `ax scroll` |
 | `Commands/ActionCommand.swift` | `ax action` - AX actions |
 | `Commands/FocusCommand.swift` | `ax focus` - activate app/element |
+| `Commands/CursorCommand.swift` | `ax cursor` - get mouse position |
+| `Commands/FocusedCommand.swift` | `ax focused` - get focused element |
+| `Commands/SelectionCommand.swift` | `ax selection` - get selected text |
+| `Commands/SetCommand.swift` | `ax set` - set element value |
+| `Commands/MoveCommand.swift` | `ax move` - move window/element |
+| `Commands/ResizeCommand.swift` | `ax resize` - resize window/element |
+| `Commands/DragCommand.swift` | `ax drag` - drag operation |
 | `Commands/LaunchCommand.swift` | `ax launch` - by bundle ID |
 | `Commands/QuitCommand.swift` | `ax quit` - terminate app |
-| `Input/MouseEvents.swift` | CGEvent mouse simulation |
+| `Input/MouseEvents.swift` | CGEvent mouse simulation + drag |
 | `Input/KeyboardEvents.swift` | CGEvent keyboard simulation |
 | `Input/KeyCodes.swift` | Key name → virtual key code mapping |
-| `Screenshot/ScreenCapture.swift` | ScreenCaptureKit wrapper |
+| `Screenshot/ScreenCapture.swift` | ScreenCaptureKit wrapper + rect capture |
 | `Documentation/HelpCommand.swift` | `ax help` subcommand dispatcher |
 | `Documentation/RolesDoc.swift` | Role reference documentation |
 | `Documentation/ActionsDoc.swift` | Action reference documentation |
 | `Documentation/AttributesDoc.swift` | Attribute reference documentation |
 | `Documentation/KeysDoc.swift` | Key names reference documentation |
 
+### Universal Addressing Implementation
+
+The address system is implemented in two files:
+
+1. **`Address.swift`** - Defines the `Address` enum and `AddressParser`:
+   - Parsing order matters: check for `@` prefix first (absolute), then `:` (element ID), then bare integer (PID)
+   - `+WxH` suffix always means "extend to rect" (uses `x` between width/height to avoid ambiguity with offsets)
+   - `@` after an element ID means offset, not absolute
+
+2. **`AddressResolver.swift`** - Resolves addresses to concrete values:
+   - `resolvePoint()` - Returns `ResolvedPoint` with x, y, and optional source element
+   - `resolveRect()` - Returns `ResolvedRect` with x, y, width, height
+   - `resolveElement()` - Returns the `Element`, using `AXUIElementCopyElementAtPosition` for coordinate-based lookups
+   - `elementsInRect()` - Finds all elements intersecting a rect (walks all apps)
+
+**Design decision:** The `@` operator is overloaded - `@500,300` is absolute (no element before it), but `1234:5678@50,50` is relative (element before it). This is unambiguous because element IDs always contain `:`.
+
+### Origin vs Frame
+
+- `origin` contains x, y in **absolute screen coordinates** - use this for clicking/targeting
+- `frame` contains x, y, width, height **relative to the parent element** - use this for understanding layout hierarchy
+- For root elements (windows), frame uses absolute coordinates since there's no parent
+- Screen coordinates use top-left origin (standard macOS accessibility coordinate system)
+
+### Command Pattern
+
+All commands follow the same pattern:
+```swift
+struct FooCommand {
+    static func run(args: CommandParser.FooArgs) {
+        do {
+            let element = try AddressResolver.resolveElement(args.address)
+            // ... do work ...
+            Output.json(result)
+        } catch let error as AXError {
+            Output.error(error)
+        } catch {
+            Output.error(.actionFailed(error.localizedDescription))
+        }
+    }
+}
+```
+
+### Backward Compatibility
+
+- `--pos x,y` still works for click/scroll (converted to `@x,y` internally in CommandParser)
+- Old element ID format with `-` separator was changed to `:` - this is a breaking change
+
+### Screen Coordinate Systems
+
+- **Accessibility API (kAXPositionAttribute):** Top-left origin, matches what we output
+- **NSEvent.mouseLocation:** Bottom-left origin (Cocoa), converted in `CursorCommand`
+- **CGEvent:** Top-left origin, no conversion needed
+
+### Element Lookup at Point
+
+`AddressResolver.elementAtPoint()` uses:
+1. Get frontmost app via `NSWorkspace.shared.frontmostApplication`
+2. Call `AXUIElementCopyElementAtPosition(app, x, y, &element)`
+3. Fallback to system-wide element if app query fails
+
+This means `ax ls @x,y` returns the element in the frontmost app at that point, not necessarily the topmost visible element if windows overlap.
+
 ### Future Enhancements
 
 Potential improvements not yet implemented:
 1. **Element lookup by path** - e.g., `ax ls 1234 "AXWindow/AXButton[@title='OK']"`
 2. **Watch mode** - Monitor element changes
-3. **Attribute setting** - `ax set <id> value "text"`
-4. **Element search** - Find by role/title across tree
+3. **Element search** - Find by role/title across tree
+4. **Multi-app element at point** - Check all apps, not just frontmost

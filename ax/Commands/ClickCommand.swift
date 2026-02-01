@@ -20,33 +20,47 @@ struct ClickCommand {
     static func run(args: CommandParser.ClickArgs, rightClick: Bool = false) {
         let button: MouseEvents.Button = rightClick ? .right : .left
 
-        if let position = args.position {
-            // Click at position
-            let point = CGPoint(x: position.x, y: position.y)
-            MouseEvents.click(at: point, button: button)
-            Output.json(ClickResult(id: nil, method: "mouse", x: position.x, y: position.y))
-        } else if let target = args.target {
-            // Click on element
-            clickElement(id: target, button: button, rightClick: rightClick)
-        } else {
-            Output.error(.invalidArguments("click requires either an element id or --pos x,y"))
+        guard let address = args.address else {
+            Output.error(.invalidArguments("click requires an address (element ID or @x,y)"))
+        }
+
+        do {
+            // Try to get an element from the address
+            if address.isElement || address.isRect {
+                // For element-based addresses, try to click the element
+                let element = try AddressResolver.resolveElement(address)
+                performClick(element: element, address: address, button: button, rightClick: rightClick)
+            } else {
+                // For point addresses, click at coordinates
+                let point = try AddressResolver.resolvePoint(address)
+                MouseEvents.click(at: point.cgPoint, button: button)
+                Output.json(ClickResult(id: nil, method: "mouse", x: point.x, y: point.y))
+            }
+        } catch let error as AXError {
+            Output.error(error)
+        } catch {
+            Output.error(.actionFailed(error.localizedDescription))
         }
     }
 
-    private static func clickElement(id: String, button: MouseEvents.Button, rightClick: Bool) {
-        // First, try to look up from registry
-        if let axElement = ElementRegistry.shared.lookup(id) {
-            let element = Element(axElement)
-            performClick(element: element, id: id, button: button, rightClick: rightClick)
+    private static func performClick(element: Element, address: Address, button: MouseEvents.Button, rightClick: Bool) {
+        let id = element.id
+
+        // For element offset addresses, click at the offset point, not the element
+        switch address {
+        case .elementOffset, .elementOffsetRect:
+            do {
+                let point = try AddressResolver.resolvePoint(address)
+                MouseEvents.click(at: point.cgPoint, button: button)
+                Output.json(ClickResult(id: id, method: "mouse", x: point.x, y: point.y))
+            } catch {
+                Output.error(.actionFailed(error.localizedDescription))
+            }
             return
+        default:
+            break
         }
 
-        // If not in registry, try to find element from apps
-        // This is a limitation - element IDs are process-specific
-        Output.error(.notFound("Element \(id) not found. Element IDs are only valid within the same command session."))
-    }
-
-    private static func performClick(element: Element, id: String, button: MouseEvents.Button, rightClick: Bool) {
         // Try AXPress action first (for buttons), unless right-clicking
         if !rightClick {
             do {

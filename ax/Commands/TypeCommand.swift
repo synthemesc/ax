@@ -11,9 +11,16 @@ import CoreGraphics
 struct TypeCommand {
 
     static func run(args: CommandParser.TypeArgs) {
-        // If target is specified, focus it first
-        if let target = args.target {
-            focusElement(id: target)
+        // If address is specified, focus it first
+        if let address = args.address {
+            do {
+                let element = try AddressResolver.resolveElement(address)
+                focusElement(element: element)
+            } catch let error as AXError {
+                Output.error(error)
+            } catch {
+                Output.error(.actionFailed(error.localizedDescription))
+            }
         }
 
         // Type the text
@@ -22,13 +29,7 @@ struct TypeCommand {
         Output.json(["typed": args.text.count])
     }
 
-    private static func focusElement(id: String) {
-        guard let axElement = ElementRegistry.shared.lookup(id) else {
-            Output.error(.notFound("Element \(id) not found"))
-        }
-
-        let element = Element(axElement)
-
+    private static func focusElement(element: Element) {
         // Try to set focus
         do {
             try element.setAttribute(kAXFocusedAttribute, value: true as CFBoolean)
@@ -38,7 +39,7 @@ struct TypeCommand {
                 MouseEvents.click(at: CGPoint(x: frame.midX, y: frame.midY))
                 usleep(100000)  // 100ms delay for focus to settle
             } else {
-                Output.error(.actionFailed("Cannot focus element \(id)"))
+                Output.error(.actionFailed("Cannot focus element \(element.id)"))
             }
         }
     }

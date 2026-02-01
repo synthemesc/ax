@@ -12,35 +12,70 @@ struct ListCommand {
     static func run(args: CommandParser.ListArgs) {
         // Handle screenshot mode
         if args.screenshot != nil || args.screenshotBase64 {
-            if let target = args.target {
-                if ElementID.isElementID(target) {
-                    // Element screenshot
-                    runAsync { try await captureElementAndOutput(id: target, args: args) }
-                } else if let pid = Int32(target) {
-                    // App screenshot
-                    runAsync { try await captureAndOutput(pid: pid, args: args) }
-                } else {
-                    Output.error(.invalidArguments("Invalid target: \(target). Use a PID or element ID."))
-                }
-            } else {
-                // Full screen screenshot
-                runAsync { try await captureAndOutput(pid: nil, args: args) }
-            }
+            runAsync { try await captureScreenshot(args: args) }
             return
         }
 
-        if let target = args.target {
-            // Check if it's a PID (numeric) or element ID (pid-hash format)
-            if ElementID.isElementID(target) {
-                listElement(id: target, depth: args.depth)
-            } else if let pid = Int32(target) {
-                listWindows(pid: pid, depth: args.depth)
-            } else {
-                Output.error(.invalidArguments("Invalid target: \(target). Use a PID or element ID."))
-            }
-        } else {
+        guard let address = args.address else {
+            // No address - list all apps
             listApps()
+            return
         }
+
+        do {
+            switch address {
+            case .pid(let pid):
+                listWindows(pid: pid, depth: args.depth)
+
+            case .element(let pid, let hash):
+                listElement(pid: pid, hash: hash, depth: args.depth)
+
+            case .elementRect(let pid, let hash, _, _):
+                // Treat as element lookup
+                listElement(pid: pid, hash: hash, depth: args.depth)
+
+            case .elementOffset:
+                // Find element at offset from given element
+                let element = try AddressResolver.resolveElement(address)
+                let tree = ElementTree.buildTree(from: element, maxDepth: args.depth)
+                Output.json(tree)
+
+            case .elementOffsetRect:
+                // Find all elements in rect offset from element
+                let rect = try AddressResolver.resolveRect(address)
+                try listElementsInRect(rect, depth: args.depth)
+
+            case .absolutePoint:
+                // Find element at point
+                let element = try AddressResolver.resolveElement(address)
+                let tree = ElementTree.buildTree(from: element, maxDepth: args.depth)
+                Output.json(tree)
+
+            case .absoluteRect:
+                // Find all elements in rect
+                let rect = try AddressResolver.resolveRect(address)
+                try listElementsInRect(rect, depth: args.depth)
+            }
+        } catch let error as AXError {
+            Output.error(error)
+        } catch {
+            Output.error(.actionFailed(error.localizedDescription))
+        }
+    }
+
+    /// List elements within a rect
+    private static func listElementsInRect(_ rect: ResolvedRect, depth: Int?) throws {
+        let elements = try AddressResolver.elementsInRect(rect)
+
+        if elements.isEmpty {
+            Output.json([ElementInfo]())
+            return
+        }
+
+        let infos = elements.map { element -> ElementInfo in
+            ElementTree.buildTree(from: element, maxDepth: depth ?? 0)
+        }
+        Output.json(infos)
     }
 
     /// Run an async block synchronously
@@ -59,77 +94,86 @@ struct ListCommand {
         semaphore.wait()
     }
 
-    /// Capture screenshot and output
-    private static func captureAndOutput(pid: pid_t?, args: CommandParser.ListArgs) async throws {
+    /// Capture screenshot based on address
+    private static func captureScreenshot(args: CommandParser.ListArgs) async throws {
         // Check screen capture permission
         if !ScreenCapture.checkPermission() {
             _ = ScreenCapture.requestPermission()
             Output.error("Screen capture permission denied. Grant access in System Settings > Privacy & Security > Screen Recording.", exitCode: .permissionDenied)
         }
 
-        // Capture the image
         let image: CGImage
-        if let pid = pid {
-            image = try await ScreenCapture.captureApp(pid: pid)
+
+        if let address = args.address {
+            switch address {
+            case .pid(let pid):
+                image = try await ScreenCapture.captureApp(pid: pid)
+                if let path = args.screenshot {
+                    try ScreenCapture.save(image, to: path)
+                    listWindows(pid: pid, depth: args.depth)
+                } else if args.screenshotBase64 {
+                    outputBase64(image)
+                }
+                return
+
+            case .element(let pid, let hash), .elementRect(let pid, let hash, _, _):
+                let id = "\(pid):\(hash)"
+                guard let axElement = ElementRegistry.shared.lookup(id) else {
+                    Output.error(.notFound("Element \(id) not found"))
+                }
+                let element = Element(axElement)
+                guard let frame = element.frame, let elementPid = element.pid else {
+                    Output.error(.actionFailed("Element has no frame or process"))
+                }
+                image = try await ScreenCapture.captureElement(frame: frame, pid: elementPid)
+                if let path = args.screenshot {
+                    try ScreenCapture.save(image, to: path)
+                    let tree = ElementTree.buildTree(from: element, maxDepth: args.depth)
+                    Output.json(tree)
+                } else if args.screenshotBase64 {
+                    outputBase64(image)
+                }
+                return
+
+            case .absoluteRect(let x, let y, let width, let height):
+                let rect = CGRect(x: x, y: y, width: width, height: height)
+                image = try await ScreenCapture.captureRect(rect)
+
+            case .absolutePoint, .elementOffset, .elementOffsetRect:
+                // For points/offsets, find the element and capture it
+                let element = try AddressResolver.resolveElement(address)
+                guard let frame = element.frame, let pid = element.pid else {
+                    Output.error(.actionFailed("Element has no frame or process"))
+                }
+                image = try await ScreenCapture.captureElement(frame: frame, pid: pid)
+                if let path = args.screenshot {
+                    try ScreenCapture.save(image, to: path)
+                    let tree = ElementTree.buildTree(from: element, maxDepth: args.depth)
+                    Output.json(tree)
+                } else if args.screenshotBase64 {
+                    outputBase64(image)
+                }
+                return
+            }
         } else {
+            // Full screen capture
             image = try await ScreenCapture.captureScreen()
         }
 
-        // Output as file or base64
+        // Output the image
         if let path = args.screenshot {
             try ScreenCapture.save(image, to: path)
-            // If also listing, continue to list after saving
-            if let pid = pid {
-                listWindows(pid: pid, depth: args.depth)
-            } else {
-                Output.json(["path": path])
-            }
+            Output.json(["path": path])
         } else if args.screenshotBase64 {
-            guard let base64 = ScreenCapture.base64PNG(image) else {
-                Output.error(.actionFailed("Failed to encode screenshot"))
-            }
-            Output.json(["screenshot": base64])
+            outputBase64(image)
         }
     }
 
-    /// Capture element screenshot and output
-    private static func captureElementAndOutput(id: String, args: CommandParser.ListArgs) async throws {
-        // Check screen capture permission
-        if !ScreenCapture.checkPermission() {
-            _ = ScreenCapture.requestPermission()
-            Output.error("Screen capture permission denied. Grant access in System Settings > Privacy & Security > Screen Recording.", exitCode: .permissionDenied)
+    private static func outputBase64(_ image: CGImage) {
+        guard let base64 = ScreenCapture.base64PNG(image) else {
+            Output.error(.actionFailed("Failed to encode screenshot"))
         }
-
-        // Look up the element
-        guard let axElement = ElementRegistry.shared.lookup(id) else {
-            Output.error(.notFound("Element \(id) not found"))
-        }
-
-        let element = Element(axElement)
-
-        // Get element's frame and PID
-        guard let frame = element.frame else {
-            Output.error(.actionFailed("Element has no frame"))
-        }
-
-        guard let pid = element.pid else {
-            Output.error(.actionFailed("Could not determine element's process"))
-        }
-
-        // Capture the element
-        let image = try await ScreenCapture.captureElement(frame: frame, pid: pid)
-
-        // Output as file or base64
-        if let path = args.screenshot {
-            try ScreenCapture.save(image, to: path)
-            // Also output the element info
-            listElement(id: id, depth: args.depth)
-        } else if args.screenshotBase64 {
-            guard let base64 = ScreenCapture.base64PNG(image) else {
-                Output.error(.actionFailed("Failed to encode screenshot"))
-            }
-            Output.json(["screenshot": base64])
-        }
+        Output.json(["screenshot": base64])
     }
 
     /// List all running applications with display info
@@ -191,8 +235,9 @@ struct ListCommand {
         }
     }
 
-    /// List element tree starting from an element ID
-    private static func listElement(id: String, depth: Int?) {
+    /// List element tree by PID and hash
+    private static func listElement(pid: pid_t, hash: CFHashCode, depth: Int?) {
+        let id = "\(pid):\(hash)"
         guard let element = ElementRegistry.shared.lookup(id) else {
             Output.error(.notFound("Element \(id) not found"))
         }

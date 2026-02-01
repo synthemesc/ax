@@ -16,9 +16,27 @@ struct ElementInfo: Codable {
     let label: String?
     let help: String?
     let identifier: String?
-    let frame: FrameInfo?
+    let frame: FrameInfo?   // Position relative to parent (x, y, width, height)
+    let origin: PointInfo?  // Absolute screen position (x, y) - use for clicking
     let enabled: Bool?
     let focused: Bool?
     let actions: [String]?
     let children: [ElementInfo]?
+}
+
+/// Point information (just x, y coordinates)
+struct PointInfo: Codable {
+    let x: Int
+    let y: Int
+
+    init(x: Int, y: Int) {
+        self.x = x
+        self.y = y
+    }
+
+    init?(frame: FrameInfo?) {
+        guard let frame = frame else { return nil }
+        self.x = frame.x
+        self.y = frame.y
+    }
 }

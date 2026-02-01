@@ -32,6 +32,13 @@ struct FrameInfo: Codable {
     let width: Int
     let height: Int
 
+    init(x: Int, y: Int, width: Int, height: Int) {
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+    }
+
     init(rect: CGRect) {
         self.x = Int(rect.origin.x)
         self.y = Int(rect.origin.y)
