@@ -13,6 +13,7 @@ struct WindowInfo: Codable {
     let frame: FrameInfo?
     let main: Bool?
     let focused: Bool?
+    let display: UInt32?
 
     init(id: String, title: String?, frame: CGRect?, main: Bool?, focused: Bool?) {
         self.id = id
@@ -20,6 +21,7 @@ struct WindowInfo: Codable {
         self.frame = frame.map(FrameInfo.init)
         self.main = main == true ? true : nil
         self.focused = focused == true ? true : nil
+        self.display = frame.flatMap { DisplayInfo.displayContaining(rect: $0) }
     }
 }
 

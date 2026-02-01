@@ -132,8 +132,10 @@ struct ListCommand {
         }
     }
 
-    /// List all running applications
+    /// List all running applications with display info
     private static func listApps() {
+        let displays = DisplayInfo.all()
+
         let apps = NSWorkspace.shared.runningApplications
             .filter { $0.activationPolicy == .regular }  // Only GUI apps
             .sorted { ($0.localizedName ?? "") < ($1.localizedName ?? "") }
@@ -145,7 +147,7 @@ struct ListCommand {
                 )
             }
 
-        Output.json(apps)
+        Output.json(AppListResult(displays: displays, apps: apps))
     }
 
     /// List windows for an application by PID

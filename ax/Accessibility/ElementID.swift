@@ -8,7 +8,7 @@
 //  underlying UI element, even across separate process invocations. This
 //  allows element IDs from `ax ls` to be used in subsequent `ax click` calls.
 //
-//  ID Format: "<pid>-<hash>" e.g., "619-1668249066"
+//  ID Format: "<pid>:<hash>" e.g., "619:1668249066"
 //  - PID identifies which app to search
 //  - Hash identifies the specific element within that app
 //
@@ -24,20 +24,20 @@ import ApplicationServices
 struct ElementID {
 
     /// Create a stable ID for an element
-    /// Format: "<pid>-<hash>"
+    /// Format: "<pid>:<hash>"
     static func makeID(for element: AXUIElement) -> String? {
         var pid: pid_t = 0
         guard AXUIElementGetPid(element, &pid) == .success else {
             return nil
         }
         let hash = CFHash(element)
-        return "\(pid)-\(hash)"
+        return "\(pid):\(hash)"
     }
 
     /// Parse an element ID into its components
     /// Returns (pid, hash) or nil if invalid format
     static func parse(_ id: String) -> (pid: pid_t, hash: CFHashCode)? {
-        let parts = id.split(separator: "-")
+        let parts = id.split(separator: ":")
         guard parts.count == 2,
               let pid = Int32(parts[0]),
               let hash = CFHashCode(parts[1]) else {
@@ -106,7 +106,7 @@ struct ElementID {
 
     /// Check if a string looks like an element ID (vs a PID)
     static func isElementID(_ string: String) -> Bool {
-        return string.contains("-") && parse(string) != nil
+        return string.contains(":") && parse(string) != nil
     }
 }
 

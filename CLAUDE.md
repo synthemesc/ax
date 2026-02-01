@@ -18,8 +18,8 @@ xcodebuild build -scheme ax -configuration Debug
 ~/Library/Developer/Xcode/DerivedData/ax-*/Build/Products/Debug/ax
 
 # Common commands
-ax ls                        # List apps
-ax ls <pid>                  # List windows
+ax ls                        # List displays + apps
+ax ls <pid>                  # List windows (includes display ID)
 ax ls <pid> --depth 3        # Element tree
 ax ls <pid>-<hash>           # Lookup element by ID
 ax click <pid>-<hash>        # Click element
@@ -51,11 +51,14 @@ The built executable is located in the derived data directory:
 ## Usage
 
 ```bash
-# List running applications
+# List displays and running applications
 ax ls
+# → {"displays": [{"id": 1, "x": 0, "y": 0, "width": 2560, "height": 1600, "scale": 2, "main": true}, ...],
+#    "apps": [{"pid": 1234, "name": "Safari", "bundle_id": "com.apple.Safari"}, ...]}
 
-# List windows for an app (by PID)
+# List windows for an app (by PID) - includes which display each window is on
 ax ls 1234
+# → [{"id": "1234:567891234", "title": "GitHub", "frame": {...}, "display": 1}, ...]
 
 # Show element tree with depth limit
 ax ls 1234 --depth 3
@@ -105,7 +108,8 @@ ax/
 │   └── ElementTree.swift   # Recursive tree traversal
 ├── Models/
 │   ├── AppInfo.swift       # Codable: pid, name, bundleId
-│   ├── WindowInfo.swift    # Codable: id, title, bounds
+│   ├── DisplayInfo.swift   # Codable: id, bounds, scale, main + AppListResult
+│   ├── WindowInfo.swift    # Codable: id, title, frame, display
 │   └── ElementInfo.swift   # Codable: id, role, title, value, actions, children
 ├── CLI/
 │   ├── CommandParser.swift # Manual argv parsing
@@ -319,6 +323,31 @@ ax ls <element-id> --screenshot /tmp/element.png
 ax ls <element-id> --screenshot-base64
 ```
 
+### Display Information
+
+The `ax ls` command returns display info alongside apps, giving AI agents the coordinate space:
+```json
+{
+  "displays": [
+    {"id": 1, "x": 0, "y": 0, "width": 2560, "height": 1600, "scale": 2, "main": true},
+    {"id": 2, "x": 2560, "y": 0, "width": 1920, "height": 1080, "scale": 1}
+  ],
+  "apps": [...]
+}
+```
+
+Each window in `ax ls <pid>` includes which display it's on:
+```json
+[
+  {"id": "1234:567891234", "title": "GitHub", "frame": {...}, "display": 1},
+  {"id": "1234:987654321", "title": "Google", "frame": {...}, "display": 2}
+]
+```
+
+Display detection uses `NSScreen.screens` and determines which display a window is on by:
+1. Checking if the window's origin falls within a display's bounds
+2. Fallback: finding the display with the largest overlap area
+
 ### Common AX Attributes Used
 
 ```swift
@@ -358,7 +387,7 @@ kAXIdentifierAttribute    // Developer-set identifier
 - Element may have been removed/recreated
 - Re-traverse tree to get fresh IDs
 
-### File Summary (29 Swift files)
+### File Summary (30 Swift files)
 
 | File | Purpose |
 |------|---------|
@@ -370,7 +399,8 @@ kAXIdentifierAttribute    // Developer-set identifier
 | `Accessibility/ElementID.swift` | **Stable IDs via CFHash**, tree search lookup |
 | `Accessibility/ElementTree.swift` | Recursive tree traversal for JSON output |
 | `Models/AppInfo.swift` | App JSON model (pid, name, bundleId) |
-| `Models/WindowInfo.swift` | Window JSON model + FrameInfo |
+| `Models/DisplayInfo.swift` | Display JSON model + AppListResult wrapper |
+| `Models/WindowInfo.swift` | Window JSON model + FrameInfo + display ID |
 | `Models/ElementInfo.swift` | Element JSON model (recursive) |
 | `CLI/Output.swift` | JSON output, stderr errors |
 | `CLI/CommandParser.swift` | Manual argv parsing |
