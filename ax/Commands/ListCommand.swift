@@ -12,12 +12,19 @@ struct ListCommand {
     static func run(args: CommandParser.ListArgs) {
         // Handle screenshot mode
         if args.screenshot != nil || args.screenshotBase64 {
-            if let target = args.target, let pid = Int32(target) {
-                runAsync { try await captureAndOutput(pid: pid, args: args) }
-            } else if args.target == nil {
-                runAsync { try await captureAndOutput(pid: nil, args: args) }
+            if let target = args.target {
+                if ElementID.isElementID(target) {
+                    // Element screenshot
+                    runAsync { try await captureElementAndOutput(id: target, args: args) }
+                } else if let pid = Int32(target) {
+                    // App screenshot
+                    runAsync { try await captureAndOutput(pid: pid, args: args) }
+                } else {
+                    Output.error(.invalidArguments("Invalid target: \(target). Use a PID or element ID."))
+                }
             } else {
-                Output.error(.invalidArguments("Screenshots with element IDs not yet supported"))
+                // Full screen screenshot
+                runAsync { try await captureAndOutput(pid: nil, args: args) }
             }
             return
         }
@@ -77,6 +84,46 @@ struct ListCommand {
             } else {
                 Output.json(["path": path])
             }
+        } else if args.screenshotBase64 {
+            guard let base64 = ScreenCapture.base64PNG(image) else {
+                Output.error(.actionFailed("Failed to encode screenshot"))
+            }
+            Output.json(["screenshot": base64])
+        }
+    }
+
+    /// Capture element screenshot and output
+    private static func captureElementAndOutput(id: String, args: CommandParser.ListArgs) async throws {
+        // Check screen capture permission
+        if !ScreenCapture.checkPermission() {
+            _ = ScreenCapture.requestPermission()
+            Output.error("Screen capture permission denied. Grant access in System Settings > Privacy & Security > Screen Recording.", exitCode: .permissionDenied)
+        }
+
+        // Look up the element
+        guard let axElement = ElementRegistry.shared.lookup(id) else {
+            Output.error(.notFound("Element \(id) not found"))
+        }
+
+        let element = Element(axElement)
+
+        // Get element's frame and PID
+        guard let frame = element.frame else {
+            Output.error(.actionFailed("Element has no frame"))
+        }
+
+        guard let pid = element.pid else {
+            Output.error(.actionFailed("Could not determine element's process"))
+        }
+
+        // Capture the element
+        let image = try await ScreenCapture.captureElement(frame: frame, pid: pid)
+
+        // Output as file or base64
+        if let path = args.screenshot {
+            try ScreenCapture.save(image, to: path)
+            // Also output the element info
+            listElement(id: id, depth: args.depth)
         } else if args.screenshotBase64 {
             guard let base64 = ScreenCapture.base64PNG(image) else {
                 Output.error(.actionFailed("Failed to encode screenshot"))

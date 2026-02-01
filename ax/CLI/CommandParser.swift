@@ -27,7 +27,7 @@ import Foundation
 struct CommandParser {
 
     enum Command {
-        case help
+        case help(HelpArgs)
         case list(ListArgs)
         case click(ClickArgs)
         case rightClick(ClickArgs)
@@ -38,6 +38,11 @@ struct CommandParser {
         case focus(FocusArgs)
         case launch(LaunchArgs)
         case quit(QuitArgs)
+    }
+
+    struct HelpArgs {
+        var topic: String?       // roles, actions, attributes, keys
+        var json: Bool = false   // --json
     }
 
     struct ListArgs {
@@ -92,14 +97,14 @@ struct CommandParser {
         var args = Array(args.dropFirst())
 
         guard let commandName = args.first else {
-            return .help
+            return .help(HelpArgs())
         }
 
         args.removeFirst()
 
         switch commandName {
         case "help", "--help", "-h":
-            return .help
+            return try .help(parseHelpArgs(args))
 
         case "ls", "list":
             return try .list(parseListArgs(args))
@@ -137,6 +142,27 @@ struct CommandParser {
     }
 
     // MARK: - Individual Parsers
+
+    private static func parseHelpArgs(_ args: [String]) throws -> HelpArgs {
+        var result = HelpArgs()
+        var i = 0
+
+        while i < args.count {
+            let arg = args[i]
+
+            if arg == "--json" {
+                result.json = true
+            } else if !arg.hasPrefix("-") {
+                result.topic = arg
+            } else {
+                throw AXError.invalidArguments("Unknown option: \(arg)")
+            }
+
+            i += 1
+        }
+
+        return result
+    }
 
     private static func parseListArgs(_ args: [String]) throws -> ListArgs {
         var result = ListArgs()

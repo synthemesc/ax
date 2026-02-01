@@ -64,6 +64,13 @@ COMMANDS:
 
     quit <pid>              Quit application by process id
 
+    help                    Show this help
+    help roles              List accessibility roles (button, window, etc.)
+    help actions            List accessibility actions (press, show_menu, etc.)
+    help attributes         Explain output fields (id, role, value, etc.)
+    help keys               List key names for ax key command
+    help --json             Machine-readable documentation
+
 OPTIONS:
     --depth, -d <n>         Limit tree traversal depth
     --pos, -p <x,y>         Screen coordinates
@@ -102,9 +109,16 @@ func main() {
         let command = try CommandParser.parse(CommandLine.arguments)
 
         switch command {
-        case .help:
-            print(helpText)
-            exit(0)
+        case .help(let args):
+            if args.json || args.topic != nil {
+                HelpCommand.run(args: HelpCommand.HelpArgs(
+                    topic: args.topic.flatMap { HelpCommand.Topic(rawValue: $0) },
+                    json: args.json
+                ))
+            } else {
+                print(helpText)
+                exit(0)
+            }
 
         case .list(let args):
             checkAccessibilityPermission()

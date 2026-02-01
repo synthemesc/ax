@@ -9,20 +9,12 @@ import CoreGraphics
 /// Handles the `ax click` and `ax rightclick` commands
 struct ClickCommand {
 
-    private struct PositionResult: Encodable {
-        let x: Int
-        let y: Int
-    }
-
-    private struct ActionResult: Encodable {
-        let action: String
-        let id: String
-    }
-
+    /// Unified click result with method field for AI agents
     private struct ClickResult: Encodable {
-        let x: Int
-        let y: Int
-        let id: String
+        let id: String?
+        let method: String  // "press" or "mouse"
+        let x: Int?
+        let y: Int?
     }
 
     static func run(args: CommandParser.ClickArgs, rightClick: Bool = false) {
@@ -32,7 +24,7 @@ struct ClickCommand {
             // Click at position
             let point = CGPoint(x: position.x, y: position.y)
             MouseEvents.click(at: point, button: button)
-            Output.json(PositionResult(x: position.x, y: position.y))
+            Output.json(ClickResult(id: nil, method: "mouse", x: position.x, y: position.y))
         } else if let target = args.target {
             // Click on element
             clickElement(id: target, button: button, rightClick: rightClick)
@@ -45,7 +37,7 @@ struct ClickCommand {
         // First, try to look up from registry
         if let axElement = ElementRegistry.shared.lookup(id) {
             let element = Element(axElement)
-            performClick(element: element, button: button, rightClick: rightClick)
+            performClick(element: element, id: id, button: button, rightClick: rightClick)
             return
         }
 
@@ -54,14 +46,16 @@ struct ClickCommand {
         Output.error(.notFound("Element \(id) not found. Element IDs are only valid within the same command session."))
     }
 
-    private static func performClick(element: Element, button: MouseEvents.Button, rightClick: Bool) {
-        // Try AXPress action first (for buttons)
+    private static func performClick(element: Element, id: String, button: MouseEvents.Button, rightClick: Bool) {
+        // Try AXPress action first (for buttons), unless right-clicking
         if !rightClick {
             do {
                 let actions = try element.actionNames()
                 if actions.contains("AXPress") {
                     try element.performAction("AXPress")
-                    Output.json(ActionResult(action: "AXPress", id: element.id))
+                    // Get position for context even when using press
+                    let (x, y) = elementCenter(element)
+                    Output.json(ClickResult(id: id, method: "press", x: x, y: y))
                     return
                 }
             } catch {
@@ -81,6 +75,12 @@ struct ClickCommand {
         )
 
         MouseEvents.click(at: point, button: button)
-        Output.json(ClickResult(x: Int(point.x), y: Int(point.y), id: element.id))
+        Output.json(ClickResult(id: id, method: "mouse", x: Int(point.x), y: Int(point.y)))
+    }
+
+    /// Get the center coordinates of an element
+    private static func elementCenter(_ element: Element) -> (Int?, Int?) {
+        guard let frame = element.frame else { return (nil, nil) }
+        return (Int(frame.midX), Int(frame.midY))
     }
 }

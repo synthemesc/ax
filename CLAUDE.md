@@ -97,7 +97,8 @@ ax/
 ├── main.swift              # Entry point, command dispatch, help text
 ├── Core/
 │   ├── ExitCode.swift      # Exit codes (0=success, 1=not found, 2=permission, 3=action failed)
-│   └── AXError.swift       # Error types mapped to exit codes
+│   ├── AXError.swift       # Error types mapped to exit codes
+│   └── AXNameFormatter.swift # AX name ↔ snake_case conversion
 ├── Accessibility/
 │   ├── Element.swift       # AXUIElement wrapper with attribute accessors
 │   ├── ElementID.swift     # Hex pointer ID handling + registry
@@ -123,8 +124,14 @@ ax/
 │   ├── MouseEvents.swift   # CGEvent mouse clicks
 │   ├── KeyboardEvents.swift# CGEvent keyboard
 │   └── KeyCodes.swift      # String to keycode mapping
-└── Screenshot/
-    └── ScreenCapture.swift # ScreenCaptureKit wrapper
+├── Screenshot/
+│   └── ScreenCapture.swift # ScreenCaptureKit wrapper
+└── Documentation/
+    ├── HelpCommand.swift   # ax help subcommand dispatcher
+    ├── RolesDoc.swift      # Role reference documentation
+    ├── ActionsDoc.swift    # Action reference documentation
+    ├── AttributesDoc.swift # Attribute reference documentation
+    └── KeysDoc.swift       # Key names reference documentation
 ```
 
 ## Key Implementation Details
@@ -273,17 +280,49 @@ All commands output Codable structs via `Output.json()`:
 - Nested structs for complex results (e.g., `ClickResult`, `LaunchResult`)
 - snake_case for JSON keys where needed (via `CodingKeys`)
 
-### Accessibility Action Names
+### Name Formatting (AXNameFormatter)
 
-Actions have AX prefix internally but user-friendly names in CLI:
-- User input: `press`, `showMenu`, `increment`
-- Internal: `AXPress`, `AXShowMenu`, `AXIncrement`
-- Conversion in `ActionCommand.formatActionName()` and `ElementTree.formatActionName()`
+All accessibility names (roles, subroles, actions) are converted to snake_case for output:
+- **Internal (AX API):** `AXStaticText`, `AXShowMenu`, `AXCloseButton`
+- **Output (JSON):** `static_text`, `show_menu`, `close_button`
+- **Input (CLI):** `ax action <id> show_menu` → converted to `AXShowMenu` internally
+
+Conversion handled by `AXNameFormatter.swift`:
+- `formatForDisplay()`: `AXStaticText` → `static_text`
+- `formatForAPI()`: `show_menu` → `AXShowMenu`
+
+### Help System
+
+Documentation subcommands for AI agents:
+```bash
+ax help roles        # List accessibility roles
+ax help actions      # List accessibility actions
+ax help attributes   # Explain output fields
+ax help keys         # List key names for ax key
+ax help --json       # Machine-readable documentation (JSON)
+```
+
+### Click Command Output
+
+The click command returns a unified JSON format with a `method` field:
+```json
+{"id": "619-123456", "method": "press", "x": 100, "y": 200}  // Used AXPress action
+{"id": "619-123456", "method": "mouse", "x": 100, "y": 200}  // Used coordinate click
+{"method": "mouse", "x": 100, "y": 200}                       // Position-only click
+```
+
+### Element Screenshots
+
+Screenshots can be taken of specific elements (cropped to element bounds):
+```bash
+ax ls <element-id> --screenshot /tmp/element.png
+ax ls <element-id> --screenshot-base64
+```
 
 ### Common AX Attributes Used
 
 ```swift
-kAXRoleAttribute          // "AXButton", "AXTextField", etc.
+kAXRoleAttribute          // "AXButton", "AXTextField", etc. (output as "button", "text_field")
 kAXTitleAttribute         // Window/element title
 kAXValueAttribute         // Current value (text fields, sliders)
 kAXPositionAttribute      // CGPoint (requires AXValue unpacking)
@@ -319,13 +358,14 @@ kAXIdentifierAttribute    // Developer-set identifier
 - Element may have been removed/recreated
 - Re-traverse tree to get fresh IDs
 
-### File Summary (24 Swift files)
+### File Summary (29 Swift files)
 
 | File | Purpose |
 |------|---------|
 | `main.swift` | Entry point, help text, command dispatch |
 | `Core/ExitCode.swift` | Exit code enum (0-4) |
 | `Core/AXError.swift` | Error types with exit code mapping |
+| `Core/AXNameFormatter.swift` | AX name ↔ snake_case conversion |
 | `Accessibility/Element.swift` | AXUIElement wrapper, attribute access |
 | `Accessibility/ElementID.swift` | **Stable IDs via CFHash**, tree search lookup |
 | `Accessibility/ElementTree.swift` | Recursive tree traversal for JSON output |
@@ -347,6 +387,11 @@ kAXIdentifierAttribute    // Developer-set identifier
 | `Input/KeyboardEvents.swift` | CGEvent keyboard simulation |
 | `Input/KeyCodes.swift` | Key name → virtual key code mapping |
 | `Screenshot/ScreenCapture.swift` | ScreenCaptureKit wrapper |
+| `Documentation/HelpCommand.swift` | `ax help` subcommand dispatcher |
+| `Documentation/RolesDoc.swift` | Role reference documentation |
+| `Documentation/ActionsDoc.swift` | Action reference documentation |
+| `Documentation/AttributesDoc.swift` | Attribute reference documentation |
+| `Documentation/KeysDoc.swift` | Key names reference documentation |
 
 ### Future Enhancements
 

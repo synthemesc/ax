@@ -107,6 +107,42 @@ struct ScreenCapture {
         return image
     }
 
+    /// Capture an element by cropping to its frame
+    /// - Parameters:
+    ///   - frame: The element's frame in screen coordinates
+    ///   - pid: The process ID of the app containing the element
+    static func captureElement(frame: CGRect, pid: pid_t) async throws -> CGImage {
+        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+
+        // Find windows for this app
+        let appWindows = content.windows.filter { $0.owningApplication?.processID == pid }
+
+        guard !appWindows.isEmpty else {
+            throw AXError.actionFailed("No windows found for pid \(pid)")
+        }
+
+        guard let display = content.displays.first else {
+            throw AXError.actionFailed("No displays found")
+        }
+
+        // Create filter with just this app's windows
+        let filter = SCContentFilter(display: display, including: appWindows)
+
+        // Configure to capture just the element's region
+        let config = SCStreamConfiguration()
+        config.sourceRect = frame
+        config.width = Int(frame.width) * 2   // Retina
+        config.height = Int(frame.height) * 2
+        config.showsCursor = false
+
+        let image = try await SCScreenshotManager.captureImage(
+            contentFilter: filter,
+            configuration: config
+        )
+
+        return image
+    }
+
     /// Save a CGImage to a file
     static func save(_ image: CGImage, to path: String) throws {
         let url = URL(fileURLWithPath: path)

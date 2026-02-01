@@ -18,9 +18,9 @@ struct ElementTree {
         // Register element to keep it alive
         let id = ElementRegistry.shared.register(element.axElement)
 
-        // Get actions (strip AX prefix and lowercase)
+        // Get actions (convert to snake_case display format)
         let actions = (try? element.actionNames())?.map { actionName in
-            formatActionName(actionName)
+            AXNameFormatter.formatForDisplay(actionName)
         } ?? []
 
         // Get children if we haven't hit max depth
@@ -35,10 +35,11 @@ struct ElementTree {
         }
 
         // Build the ElementInfo
+        // Format role and subrole to snake_case display format
         return ElementInfo(
             id: id,
-            role: element.role,
-            subrole: element.subrole,
+            role: element.role.map { AXNameFormatter.formatForDisplay($0) },
+            subrole: element.subrole.map { AXNameFormatter.formatForDisplay($0) },
             title: element.title,
             description: element.description,
             value: formatValue(element.value),
@@ -51,19 +52,6 @@ struct ElementTree {
             actions: actions.isEmpty ? nil : actions,
             children: children
         )
-    }
-
-    /// Format action name: strip "AX" prefix and lowercase first letter
-    private static func formatActionName(_ name: String) -> String {
-        var result = name
-        if result.hasPrefix("AX") {
-            result = String(result.dropFirst(2))
-        }
-        // Lowercase first character
-        if let first = result.first {
-            result = first.lowercased() + result.dropFirst()
-        }
-        return result
     }
 
     /// Format a value for JSON output
