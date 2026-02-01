@@ -23,11 +23,13 @@ struct ListCommand {
         }
 
         if let target = args.target {
-            // Check if it's a PID (numeric) or element ID (hex)
-            if let pid = Int32(target) {
+            // Check if it's a PID (numeric) or element ID (pid-hash format)
+            if ElementID.isElementID(target) {
+                listElement(id: target, depth: args.depth)
+            } else if let pid = Int32(target) {
                 listWindows(pid: pid, depth: args.depth)
             } else {
-                listElement(id: target, depth: args.depth)
+                Output.error(.invalidArguments("Invalid target: \(target). Use a PID or element ID."))
             }
         } else {
             listApps()

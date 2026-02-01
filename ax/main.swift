@@ -79,11 +79,17 @@ EXIT CODES:
     3   Action failed
     4   Invalid arguments
 
+ELEMENT IDs:
+    IDs have format: <pid>-<hash> (e.g., 619-1668249066)
+    IDs are stable across invocations while the app is running.
+
 EXAMPLES:
     ax ls                           # List all apps
     ax ls 1234                      # List windows for app with pid 1234
-    ax ls 0x7f8a2c --depth 3        # Show element tree, 3 levels deep
-    ax click 0x7f8a2c               # Click element
+    ax ls 1234-5678901              # Show element tree from element ID
+    ax ls 1234 --depth 3            # Show windows with 3 levels of children
+    ax click 1234-5678901           # Click element by ID
+    ax click --pos 100,200          # Click at coordinates
     ax type "Hello, world!"         # Type into focused element
     ax key cmd+s                    # Press Cmd+S
     ax launch com.apple.Safari      # Launch Safari

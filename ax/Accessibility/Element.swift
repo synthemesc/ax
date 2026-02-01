@@ -25,9 +25,9 @@ import CoreGraphics
 final class Element {
     let axElement: AXUIElement
 
-    /// The element's unique ID (hex pointer)
+    /// The element's stable ID (pid-hash format)
     var id: String {
-        ElementRegistry.makeID(axElement)
+        ElementID.makeID(for: axElement) ?? "unknown"
     }
 
     init(_ element: AXUIElement) {

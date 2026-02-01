@@ -6,6 +6,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `ax` is a macOS command-line tool that exposes the accessibility tree as JSON for AI agents. It allows listing applications, inspecting windows and UI elements, simulating clicks and keyboard input, and taking screenshots.
 
+**Status:** Fully functional as of 2026-02-01. All commands implemented and tested.
+
+## Quick Reference
+
+```bash
+# Build
+xcodebuild build -scheme ax -configuration Debug
+
+# Run (after build)
+~/Library/Developer/Xcode/DerivedData/ax-*/Build/Products/Debug/ax
+
+# Common commands
+ax ls                        # List apps
+ax ls <pid>                  # List windows
+ax ls <pid> --depth 3        # Element tree
+ax ls <pid>-<hash>           # Lookup element by ID
+ax click <pid>-<hash>        # Click element
+ax click --pos x,y           # Click coordinates
+ax type "text"               # Type into focused element
+ax key cmd+s                 # Key combo
+ax launch com.apple.Safari   # Launch app
+ax quit <pid>                # Quit app
+```
+
 ## Build Commands
 
 ```bash
@@ -107,7 +131,7 @@ ax/
 
 - **Frameworks:** ApplicationServices (AXUIElement), CoreGraphics (CGEvent), AppKit (NSWorkspace), ScreenCaptureKit, Carbon.HIToolbox (key codes)
 - **Permissions:** Requires Accessibility permission (`AXIsProcessTrusted()`) and Screen Recording for screenshots
-- **Element IDs:** Hex-encoded AXUIElement pointers, valid only within same command session
+- **Element IDs:** Stable `pid-hash` format (e.g., `619-1668249066`) using CFHash - persists across invocations
 - **JSON Output:** All commands output JSON to stdout, errors go to stderr
 
 ## Exit Codes
@@ -127,14 +151,41 @@ ax/
 
 ## Implementation Notes
 
-### Element ID Limitations
+### Element IDs - Stable Across Invocations
 
-Element IDs are hex-encoded pointers to AXUIElement objects (e.g., `0x7f8a2c`). **Critical limitation:** These IDs are only valid within the same process execution. The `ElementRegistry` keeps elements alive during a command, but IDs from a previous `ax ls` call cannot be used in a subsequent `ax click` call.
+Element IDs use the format `<pid>-<hash>` (e.g., `619-1668249066`):
+- **PID:** Identifies which application to search
+- **Hash:** CFHash of the AXUIElement, stable for the same underlying UI element
 
-**Workaround for scripting:** Use `ax ls <pid> --depth N` to get the full tree with IDs, then immediately use those IDs in the same script session. For cross-process use, consider:
-1. Finding elements by role/title/identifier instead of ID
-2. Using coordinate-based clicking (`ax click --pos x,y`)
-3. Building a persistent element lookup (future enhancement)
+**Key insight:** While AXUIElement pointers change on each API call (different wrapper objects), `CFHash()` returns the same value for elements referring to the same underlying NSView/NSWindow. This enables:
+
+```bash
+# First invocation - get element IDs
+ax ls 619 --depth 3
+# Output includes: "id": "619-1668249066"
+
+# Second invocation - use that ID
+ax click 619-1668249066   # Works!
+ax ls 619-1668249066      # Works!
+```
+
+**Lookup mechanism:** When given an ID, the system:
+1. Parses PID and hash from the ID
+2. Creates `AXUIElementCreateApplication(pid)`
+3. Walks the element tree comparing `CFHash()` until match found
+4. Caches found elements for repeated lookups
+
+**Limitation:** IDs are only stable while the app is running. If an app restarts, it gets a new PID and new element hashes.
+
+**Critical Discovery (2026-02-01):** The key insight was that `CFHash(axElement)` returns a stable hash based on the *underlying* UI element (NSView/NSWindow), not the AXUIElement wrapper object. Two different AXUIElement pointers referencing the same button will have identical CFHash values. This was verified experimentally:
+```
+// Same element queried twice = different pointers, same hash
+app1 pointer: 0x0000000c980dc030
+app2 pointer: 0x0000000c980dc150  ← Different!
+app1 hash: 1634759307
+app2 hash: 1634759307              ← Same!
+CFEqual(app1, app2): true
+```
 
 ### AXUIElement Wrapper Pattern (Element.swift)
 
@@ -244,6 +295,59 @@ kAXEnabledAttribute       // Bool - is enabled
 kAXIdentifierAttribute    // Developer-set identifier
 ```
 
+### Troubleshooting
+
+**"Accessibility permission denied"**
+- Grant access: System Settings > Privacy & Security > Accessibility
+- Add Terminal (or the app running `ax`) to the list
+
+**"Screen capture permission denied"**
+- Grant access: System Settings > Privacy & Security > Screen Recording
+- Required for `--screenshot` and `--screenshot-base64`
+
+**"Element not found" after app restart**
+- Element IDs include PID, which changes on restart
+- Re-run `ax ls <pid>` to get new IDs
+
+**"cannotComplete" error on action**
+- Some elements don't support certain actions
+- Check available actions with `ax ls <id>` (look at "actions" array)
+- Try coordinate-based click instead: `ax click --pos x,y`
+
+**Stale element reference**
+- UI changed since ID was obtained
+- Element may have been removed/recreated
+- Re-traverse tree to get fresh IDs
+
+### File Summary (24 Swift files)
+
+| File | Purpose |
+|------|---------|
+| `main.swift` | Entry point, help text, command dispatch |
+| `Core/ExitCode.swift` | Exit code enum (0-4) |
+| `Core/AXError.swift` | Error types with exit code mapping |
+| `Accessibility/Element.swift` | AXUIElement wrapper, attribute access |
+| `Accessibility/ElementID.swift` | **Stable IDs via CFHash**, tree search lookup |
+| `Accessibility/ElementTree.swift` | Recursive tree traversal for JSON output |
+| `Models/AppInfo.swift` | App JSON model (pid, name, bundleId) |
+| `Models/WindowInfo.swift` | Window JSON model + FrameInfo |
+| `Models/ElementInfo.swift` | Element JSON model (recursive) |
+| `CLI/Output.swift` | JSON output, stderr errors |
+| `CLI/CommandParser.swift` | Manual argv parsing |
+| `Commands/ListCommand.swift` | `ax ls` - apps, windows, elements |
+| `Commands/ClickCommand.swift` | `ax click` / `ax rightclick` |
+| `Commands/TypeCommand.swift` | `ax type` - Unicode text input |
+| `Commands/KeyCommand.swift` | `ax key` - key combos |
+| `Commands/ScrollCommand.swift` | `ax scroll` |
+| `Commands/ActionCommand.swift` | `ax action` - AX actions |
+| `Commands/FocusCommand.swift` | `ax focus` - activate app/element |
+| `Commands/LaunchCommand.swift` | `ax launch` - by bundle ID |
+| `Commands/QuitCommand.swift` | `ax quit` - terminate app |
+| `Input/MouseEvents.swift` | CGEvent mouse simulation |
+| `Input/KeyboardEvents.swift` | CGEvent keyboard simulation |
+| `Input/KeyCodes.swift` | Key name → virtual key code mapping |
+| `Screenshot/ScreenCapture.swift` | ScreenCaptureKit wrapper |
+
 ### Future Enhancements
 
 Potential improvements not yet implemented:
@@ -251,4 +355,3 @@ Potential improvements not yet implemented:
 2. **Watch mode** - Monitor element changes
 3. **Attribute setting** - `ax set <id> value "text"`
 4. **Element search** - Find by role/title across tree
-5. **Persistent element references** - Survive across invocations
