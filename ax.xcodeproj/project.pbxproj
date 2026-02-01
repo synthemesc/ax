@@ -20,6 +20,7 @@
 
 /* Begin PBXFileReference section */
 		03320F5F2F2FAF6500E551FE /* ax */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = ax; sourceTree = BUILT_PRODUCTS_DIR; };
+		03320FC62F300AD500E551FE /* axtest.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = axtest.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -28,10 +29,22 @@
 			path = ax;
 			sourceTree = "<group>";
 		};
+		03320FC72F300AD500E551FE /* axtest */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = axtest;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		03320F5C2F2FAF6500E551FE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		03320FC32F300AD500E551FE /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -45,6 +58,7 @@
 			isa = PBXGroup;
 			children = (
 				03320F612F2FAF6500E551FE /* ax */,
+				03320FC72F300AD500E551FE /* axtest */,
 				03320F602F2FAF6500E551FE /* Products */,
 			);
 			sourceTree = "<group>";
@@ -53,6 +67,7 @@
 			isa = PBXGroup;
 			children = (
 				03320F5F2F2FAF6500E551FE /* ax */,
+				03320FC62F300AD500E551FE /* axtest.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -82,6 +97,28 @@
 			productReference = 03320F5F2F2FAF6500E551FE /* ax */;
 			productType = "com.apple.product-type.tool";
 		};
+		03320FC52F300AD500E551FE /* axtest */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 03320FCE2F300AD600E551FE /* Build configuration list for PBXNativeTarget "axtest" */;
+			buildPhases = (
+				03320FC22F300AD500E551FE /* Sources */,
+				03320FC32F300AD500E551FE /* Frameworks */,
+				03320FC42F300AD500E551FE /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				03320FC72F300AD500E551FE /* axtest */,
+			);
+			name = axtest;
+			packageProductDependencies = (
+			);
+			productName = axtest;
+			productReference = 03320FC62F300AD500E551FE /* axtest.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -93,6 +130,9 @@
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
 					03320F5E2F2FAF6500E551FE = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					03320FC52F300AD500E551FE = {
 						CreatedOnToolsVersion = 26.2;
 					};
 				};
@@ -112,12 +152,30 @@
 			projectRoot = "";
 			targets = (
 				03320F5E2F2FAF6500E551FE /* ax */,
+				03320FC52F300AD500E551FE /* axtest */,
 			);
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		03320FC42F300AD500E551FE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		03320F5B2F2FAF6500E551FE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		03320FC22F300AD500E551FE /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -273,6 +331,70 @@
 			};
 			name = Release;
 		};
+		03320FCF2F300AD600E551FE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K9F99M9Q6T;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.joshuaeckstein.axtest;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		03320FD02F300AD600E551FE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K9F99M9Q6T;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.joshuaeckstein.axtest;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -290,6 +412,15 @@
 			buildConfigurations = (
 				03320F672F2FAF6500E551FE /* Debug */,
 				03320F682F2FAF6500E551FE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		03320FCE2F300AD600E551FE /* Build configuration list for PBXNativeTarget "axtest" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				03320FCF2F300AD600E551FE /* Debug */,
+				03320FD02F300AD600E551FE /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

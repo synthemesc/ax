@@ -13,9 +13,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 # Build
 xcodebuild build -scheme ax -configuration Debug
+xcodebuild build -scheme axtest -configuration Debug
 
 # Run (after build)
 ~/Library/Developer/Xcode/DerivedData/ax-*/Build/Products/Debug/ax
+
+# Run tests
+./tests/test_ax.sh
 
 # Common commands
 ax ls                        # List displays + apps
@@ -565,6 +569,126 @@ struct FooCommand {
 3. Fallback to system-wide element if app query fails
 
 This means `ax ls @x,y` returns the element in the frontmost app at that point, not necessarily the topmost visible element if windows overlap.
+
+## Testing
+
+### Running Tests
+
+```bash
+# Build both targets first
+xcodebuild build -scheme ax -configuration Debug
+xcodebuild build -scheme axtest -configuration Debug
+
+# Run the test suite
+./tests/test_ax.sh
+```
+
+### Test Architecture
+
+The test infrastructure consists of:
+
+1. **`axtest/`** - A SwiftUI test harness app with UI elements for each test scenario
+2. **`tests/test_ax.sh`** - Shell script test runner (26 tests)
+
+**Key insight:** Tests use accessibility identifiers to find elements, and an `action_log` element to verify actions occurred. After clicking a button, the test reads the action_log's value to confirm the click registered.
+
+### Test Coverage
+
+| Category | Tests |
+|----------|-------|
+| Listing | `ls_apps`, `ls_windows`, `ls_depth`, `ls_element`, `ls_point` |
+| Clicking | `click_element`, `click_coordinates`, `click_offset`, `rightclick` |
+| Actions | `action_press` |
+| Input | `type`, `key` |
+| Scrolling | `scroll` |
+| Focus | `focus`, `focused` |
+| Queries | `cursor`, `selection` |
+| Modification | `set`, `move`, `resize`, `drag` |
+| App Control | `launch`, `quit` |
+| Screenshots | `screenshot`, `screenshot_element` |
+| Tree | `nested_tree` |
+
+### Known Limitations
+
+1. **`type` and `key` tests verify command execution only** - CGEvent keyboard input goes to the system's frontmost app (Terminal when running from script), not the target app. The tests verify the commands return valid JSON but can't verify text actually appeared.
+
+2. **`focused` test accepts "no focused element"** - When running from Terminal, there may be no focused element in the accessibility sense.
+
+3. **SwiftUI accessibility quirks:**
+   - Empty `Text("")` elements may not appear in the accessibility tree
+   - The `action_log` uses a disabled `TextField` instead of `Text` to ensure it's always present
+   - `VStack`/`HStack` don't automatically become accessibility containers
+
+### Test Harness Elements (axtest)
+
+| Identifier | Element | Purpose |
+|------------|---------|---------|
+| `action_log` | TextField (disabled) | Verification target - shows last action |
+| `test_button` | Button | Click/action tests |
+| `test_button_2` | Button | Coordinate click tests |
+| `test_toggle` | Toggle | Value change tests |
+| `test_textfield` | TextField | Type/set/focus/selection tests |
+| `test_textarea` | TextEditor | Multi-line text tests |
+| `test_slider` | Slider | Numeric value tests |
+| `test_stepper` | Stepper | Increment/decrement tests |
+| `test_scrollview` | ScrollView | Scroll tests |
+| `test_container` | GroupBox | Container for nested items |
+| `nested_item_a/b/c/d` | Buttons | Tree traversal tests |
+| `reset_button` | Button | Resets app state between tests |
+
+### Writing New Tests
+
+```bash
+# Pattern for a new test
+test_example() {
+    reset_app  # Reset state
+
+    local element_id
+    element_id=$(find_element "identifier")  # Find by accessibility identifier
+
+    if [[ -z "$element_id" ]]; then
+        log_fail "example" "Could not find element"
+        return
+    fi
+
+    "$AX_BIN" some_command "$element_id" >/dev/null 2>&1
+    settle  # Wait for UI
+
+    local result
+    result=$(read_action_log)  # Or read element value directly
+
+    if [[ "$result" == "expected" ]]; then
+        log_pass "example"
+    else
+        log_fail "example" "Expected 'expected', got '$result'"
+    fi
+}
+```
+
+### Debugging Test Failures
+
+```bash
+# Get element tree
+ax ls $(pgrep -x axtest) --depth 15 | jq '.[] | recurse | select(.identifier)'
+
+# Check specific element
+ax ls <element-id> | jq '{role, value, identifier, focused}'
+
+# Verify action_log is present and readable
+ax ls $(pgrep -x axtest) --depth 15 | jq 'recurse | select(.identifier == "action_log")'
+```
+
+### Gotchas
+
+1. **`set -e` and arithmetic** - `((count++))` returns exit code 1 when count is 0. Use `((count++)) || true`.
+
+2. **jq with large JSON** - Piping large JSON through subshells can fail silently. The test script saves the element tree to a temp file for reliable parsing.
+
+3. **Element cache** - Tests cache the element tree for performance. If UI changes significantly during tests, call `refresh_cache`.
+
+4. **Timing** - Use `settle` (0.2s sleep) after actions to let UI update. Increase if tests are flaky.
+
+5. **Permissions** - Tests require Accessibility and Screen Recording permissions for Terminal.
 
 ### Future Enhancements
 
