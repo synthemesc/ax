@@ -137,7 +137,8 @@ struct ListCommand {
 
             case .absoluteRect(let x, let y, let width, let height):
                 let rect = CGRect(x: x, y: y, width: width, height: height)
-                image = try await ScreenCapture.captureRect(rect)
+                let excludeIds = args.excludeWindowIds.map { CGWindowID($0) }
+                image = try await ScreenCapture.captureRect(rect, excluding: excludeIds)
 
             case .absolutePoint, .elementOffset, .elementOffsetRect:
                 // For points/offsets, find the element and capture it
@@ -157,7 +158,8 @@ struct ListCommand {
             }
         } else {
             // Full screen capture
-            image = try await ScreenCapture.captureScreen()
+            let excludeIds = args.excludeWindowIds.map { CGWindowID($0) }
+            image = try await ScreenCapture.captureScreen(excluding: excludeIds)
         }
 
         // Output the image

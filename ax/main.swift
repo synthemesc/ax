@@ -79,6 +79,9 @@ COMMANDS:
     launch <bundle-id>      Launch application by bundle identifier
     quit <pid>              Quit application by process id
 
+    lock                    Lock human HID input (ax commands still work)
+    unlock                  Unlock human HID input
+
     help                    Show this help
     help roles              List accessibility roles
     help actions            List accessibility actions
@@ -92,6 +95,8 @@ OPTIONS:
     --repeat, -r <n>        Repeat count for key presses
     --screenshot <path>     Save screenshot to file (with ls)
     --screenshot-base64     Include screenshot as base64 in JSON (with ls)
+    --exclude <windowId>    Exclude window from screenshot (with ls)
+    --timeout, -t <n>       Lock timeout in seconds (max 300, with lock)
     --help, -h              Show this help
 
 EXIT CODES:
@@ -123,6 +128,9 @@ EXAMPLES:
     ax resize 1234:5678901 800x600  # Resize window
     ax drag @100,200 --to @300,400  # Drag from one point to another
     ax launch com.apple.Safari      # Launch Safari
+    ax lock                         # Lock human input (ax commands still work)
+    ax lock --timeout 30            # Lock with 30 second timeout
+    ax unlock                       # Unlock input
 """
 
 // MARK: - Main
@@ -208,6 +216,13 @@ func main() {
         case .drag(let args):
             checkAccessibilityPermission()
             DragCommand.run(args: args)
+
+        case .lock(let args):
+            checkAccessibilityPermission()
+            LockCommand.run(args: args)
+
+        case .unlock:
+            UnlockCommand.run()
         }
     } catch let error as AXError {
         Output.error(error)

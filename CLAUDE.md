@@ -13,6 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 # Build
 xcodebuild build -scheme ax -configuration Debug
+xcodebuild build -scheme axlockd -configuration Debug
 xcodebuild build -scheme axtest -configuration Debug
 
 # Run (after build)
@@ -41,6 +42,9 @@ ax resize <id> 800x600       # Resize window
 ax drag @100,200 --to @300,400  # Drag operation
 ax launch com.apple.Safari   # Launch app
 ax quit <pid>                # Quit app
+ax lock                      # Lock human input
+ax lock --timeout 30         # Lock with timeout
+ax unlock                    # Unlock input
 ```
 
 ## Address Formats
@@ -155,6 +159,13 @@ ax drag 1234:5678901@10,10 --to 1234:9876543@10,10
 # Launch/quit applications
 ax launch com.apple.Safari
 ax quit 1234
+
+# Lock/unlock input (for automation sequences)
+ax lock                      # Lock human HID input, ax commands still work
+ax lock --timeout 30         # Lock with 30 second timeout (max 300)
+ax unlock                    # Unlock human input
+# Triple-press Escape to emergency unlock
+# Lock shows overlay on all screens
 ```
 
 ## Architecture
@@ -196,7 +207,11 @@ ax/
 │   ├── ResizeCommand.swift # ax resize
 │   ├── DragCommand.swift   # ax drag
 │   ├── LaunchCommand.swift # ax launch
-│   └── QuitCommand.swift   # ax quit
+│   ├── QuitCommand.swift   # ax quit
+│   ├── LockCommand.swift   # ax lock
+│   └── UnlockCommand.swift # ax unlock
+├── Lock/
+│   └── LockState.swift     # PID file management for lock state
 ├── Input/
 │   ├── MouseEvents.swift   # CGEvent mouse clicks
 │   ├── KeyboardEvents.swift# CGEvent keyboard
@@ -209,6 +224,12 @@ ax/
     ├── ActionsDoc.swift    # Action reference documentation
     ├── AttributesDoc.swift # Attribute reference documentation
     └── KeysDoc.swift       # Key names reference documentation
+
+axlockd/                        # Separate daemon app for input locking
+├── axlockdApp.swift            # Daemon entry point, coordinates tap + overlay + timeout
+├── EventTap.swift              # CGEventTap wrapper, escape detection
+├── OverlayWindow.swift         # NSWindow subclass for visual feedback
+└── axlockd.entitlements        # Entitlements (no sandbox for event tap)
 ```
 
 ## Key Implementation Details
@@ -462,7 +483,7 @@ kAXIdentifierAttribute    // Developer-set identifier
 - Element may have been removed/recreated
 - Re-traverse tree to get fresh IDs
 
-### File Summary (39 Swift files)
+### File Summary (46 Swift files)
 
 | File | Purpose |
 |------|---------|
@@ -497,6 +518,9 @@ kAXIdentifierAttribute    // Developer-set identifier
 | `Commands/DragCommand.swift` | `ax drag` - drag operation |
 | `Commands/LaunchCommand.swift` | `ax launch` - by bundle ID |
 | `Commands/QuitCommand.swift` | `ax quit` - terminate app |
+| `Commands/LockCommand.swift` | `ax lock` - spawn axlockd daemon |
+| `Commands/UnlockCommand.swift` | `ax unlock` - terminate axlockd daemon |
+| `Lock/LockState.swift` | PID file management for lock state |
 | `Input/MouseEvents.swift` | CGEvent mouse simulation + drag |
 | `Input/KeyboardEvents.swift` | CGEvent keyboard simulation |
 | `Input/KeyCodes.swift` | Key name → virtual key code mapping |
@@ -506,6 +530,9 @@ kAXIdentifierAttribute    // Developer-set identifier
 | `Documentation/ActionsDoc.swift` | Action reference documentation |
 | `Documentation/AttributesDoc.swift` | Attribute reference documentation |
 | `Documentation/KeysDoc.swift` | Key names reference documentation |
+| `axlockd/axlockdApp.swift` | Lock daemon entry point + coordination |
+| `axlockd/EventTap.swift` | CGEventTap wrapper, escape detection |
+| `axlockd/OverlayWindow.swift` | Semi-transparent overlay windows |
 
 ### Universal Addressing Implementation
 
@@ -549,6 +576,72 @@ struct FooCommand {
     }
 }
 ```
+
+### Input Locking (ax lock/unlock)
+
+The lock system allows automation sequences to run without human interference:
+
+**Architecture:**
+- `ax lock` spawns `axlockd` daemon (separate macOS app target)
+- `axlockd` creates a CGEventTap to intercept HID input
+- Events marked with `userData = 0x4158304158` pass through (ax-generated)
+- Unmarked events (human input) are suppressed
+- Visual overlay shows lock state on all screens
+
+**Event Marking:**
+- `MouseEvents` and `KeyboardEvents` use `CGEventSource.userData` to mark events
+- The event tap checks this field to distinguish ax vs human input
+
+**Safety Features:**
+- Triple-press Escape to emergency unlock (tracked via timestamps)
+- Timeout auto-unlocks (default 60s, max 300s)
+- PID file at `~/.ax-lock.pid` tracks daemon process
+- Stale PIDs detected and cleaned up automatically
+
+**Output Format:**
+```json
+// ax lock
+{"status": "locked", "pid": 12345, "window_id": 8765, "timeout": 60}
+// ax unlock
+{"status": "unlocked"}
+// ax unlock when not locked
+{"status": "not_locked"}
+// ax lock when already locked
+{"error": "already locked", "pid": 12345}
+```
+
+**Build Requirements:**
+- Must build both `ax` and `axlockd` targets: `xcodebuild build -scheme axlockd -configuration Debug`
+- `axlockd` is a macOS app bundle at `Products/Debug/axlockd.app/Contents/MacOS/axlockd`
+- App Sandbox must be disabled for `axlockd` (requires accessibility permission for CGEventTap)
+
+**IPC Mechanism:**
+- `ax lock` creates temp file at `/tmp/ax-lock-<pid>.ipc`
+- Passes `--ipc-file <path>` to axlockd
+- axlockd writes window ID to file, parent reads after 500ms delay
+- Temp file is cleaned up after reading
+- Note: Using stdout pipe caused daemon to exit prematurely due to SIGPIPE when pipe closed
+
+**Debugging:**
+```bash
+# Run axlockd directly to see errors
+~/Library/Developer/Xcode/DerivedData/ax-*/Build/Products/Debug/axlockd.app/Contents/MacOS/axlockd --timeout 10
+
+# Check if daemon is running
+pgrep -l axlockd
+
+# Check PID file
+cat ~/.ax-lock.pid
+
+# Force cleanup if stuck
+rm ~/.ax-lock.pid && pkill axlockd
+```
+
+**Gotchas:**
+- CGEventTap requires Accessibility permission for axlockd.app (System Settings > Privacy > Accessibility)
+- If event tap fails to create, daemon exits immediately with error to stderr
+- Overlay windows use `level = .statusBar + 1` and `ignoresMouseEvents = true`
+- Event marker value `0x4158304158` = "AX0AX" in ASCII (must match in MouseEvents, KeyboardEvents, and EventTap)
 
 ### Backward Compatibility
 

@@ -40,14 +40,17 @@ struct ScreenCapture {
     }
 
     /// Capture the entire screen (main display)
-    static func captureScreen() async throws -> CGImage {
+    /// - Parameter excluding: Window IDs to exclude from capture (e.g., overlay windows)
+    static func captureScreen(excluding: [CGWindowID] = []) async throws -> CGImage {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
 
         guard let display = content.displays.first else {
             throw AXError.actionFailed("No displays found")
         }
 
-        let filter = SCContentFilter(display: display, excludingWindows: [])
+        // Filter out excluded windows
+        let excludeWindows = content.windows.filter { excluding.contains(CGWindowID($0.windowID)) }
+        let filter = SCContentFilter(display: display, excludingWindows: excludeWindows)
         let config = SCStreamConfiguration()
         config.width = Int(display.width) * 2  // Retina
         config.height = Int(display.height) * 2
@@ -108,15 +111,19 @@ struct ScreenCapture {
     }
 
     /// Capture a rectangular region of the screen
-    /// - Parameter rect: The rect in screen coordinates
-    static func captureRect(_ rect: CGRect) async throws -> CGImage {
+    /// - Parameters:
+    ///   - rect: The rect in screen coordinates
+    ///   - excluding: Window IDs to exclude from capture
+    static func captureRect(_ rect: CGRect, excluding: [CGWindowID] = []) async throws -> CGImage {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
 
         guard let display = content.displays.first else {
             throw AXError.actionFailed("No displays found")
         }
 
-        let filter = SCContentFilter(display: display, excludingWindows: [])
+        // Filter out excluded windows
+        let excludeWindows = content.windows.filter { excluding.contains(CGWindowID($0.windowID)) }
+        let filter = SCContentFilter(display: display, excludingWindows: excludeWindows)
         let config = SCStreamConfiguration()
         config.sourceRect = rect
         config.width = Int(rect.width) * 2   // Retina

@@ -45,6 +45,8 @@ struct CommandParser {
         case move(MoveArgs)
         case resize(ResizeArgs)
         case drag(DragArgs)
+        case lock(LockArgs)
+        case unlock
     }
 
     struct HelpArgs {
@@ -57,6 +59,7 @@ struct CommandParser {
         var depth: Int?          // --depth N
         var screenshot: String?  // --screenshot path
         var screenshotBase64: Bool = false  // --screenshot-base64
+        var excludeWindowIds: [UInt32] = []  // --exclude windowId (for screenshot)
     }
 
     struct ClickArgs {
@@ -121,6 +124,10 @@ struct CommandParser {
     struct DragArgs {
         var from: Address        // start position
         var to: Address          // --to end position
+    }
+
+    struct LockArgs {
+        var timeout: Int = 60    // --timeout N (seconds, max 300)
     }
 
     /// Parse command line arguments
@@ -190,6 +197,12 @@ struct CommandParser {
         case "drag":
             return try .drag(parseDragArgs(args))
 
+        case "lock":
+            return try .lock(parseLockArgs(args))
+
+        case "unlock":
+            return .unlock
+
         default:
             throw AXError.invalidArguments("Unknown command: \(commandName)")
         }
@@ -239,6 +252,12 @@ struct CommandParser {
                 result.screenshot = args[i]
             } else if arg == "--screenshot-base64" {
                 result.screenshotBase64 = true
+            } else if arg == "--exclude" {
+                i += 1
+                guard i < args.count, let windowId = UInt32(args[i]) else {
+                    throw AXError.invalidArguments("--exclude requires a window ID number")
+                }
+                result.excludeWindowIds.append(windowId)
             } else if !arg.hasPrefix("-") {
                 result.address = try AddressParser.parse(arg)
             } else {
@@ -523,6 +542,30 @@ struct CommandParser {
         }
 
         return DragArgs(from: fromAddr, to: toAddr)
+    }
+
+    private static func parseLockArgs(_ args: [String]) throws -> LockArgs {
+        var result = LockArgs()
+        var i = 0
+
+        while i < args.count {
+            let arg = args[i]
+
+            if arg == "--timeout" || arg == "-t" {
+                i += 1
+                guard i < args.count, let timeout = Int(args[i]) else {
+                    throw AXError.invalidArguments("--timeout requires a number")
+                }
+                // Cap timeout at 300 seconds (5 minutes)
+                result.timeout = min(timeout, 300)
+            } else {
+                throw AXError.invalidArguments("Unknown option: \(arg)")
+            }
+
+            i += 1
+        }
+
+        return result
     }
 
     // MARK: - Helpers

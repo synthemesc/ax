@@ -10,6 +10,18 @@ import Carbon.HIToolbox
 /// Keyboard event utilities using CGEvent
 struct KeyboardEvents {
 
+    /// Marker value to identify ax-generated events (allows them to pass through event taps)
+    static let eventMarker: Int64 = 0x4158304158  // "AX0AX" in hex
+
+    /// Create an event source with our marker value
+    private static func markedSource() -> CGEventSource? {
+        guard let source = CGEventSource(stateID: .hidSystemState) else {
+            return nil
+        }
+        source.userData = eventMarker
+        return source
+    }
+
     /// Type a string of text using Unicode input
     static func type(_ text: String) {
         for char in text {
@@ -20,9 +32,10 @@ struct KeyboardEvents {
     /// Type a single character
     private static func typeCharacter(_ char: Character) {
         let utf16 = Array(String(char).utf16)
+        let source = markedSource()
 
-        guard let downEvent = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: true),
-              let upEvent = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: false) else {
+        guard let downEvent = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true),
+              let upEvent = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false) else {
             return
         }
 
@@ -72,8 +85,9 @@ struct KeyboardEvents {
 
     /// Press a key with optional modifiers
     static func pressKey(code: CGKeyCode, modifiers: CGEventFlags = []) {
-        guard let downEvent = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: true),
-              let upEvent = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: false) else {
+        let source = markedSource()
+        guard let downEvent = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: true),
+              let upEvent = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: false) else {
             return
         }
 
@@ -127,12 +141,14 @@ struct KeyboardEvents {
     }
 
     private static func pressKeyDown(code: CGKeyCode) {
-        guard let event = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: true) else { return }
+        let source = markedSource()
+        guard let event = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: true) else { return }
         event.post(tap: .cghidEventTap)
     }
 
     private static func pressKeyUp(code: CGKeyCode) {
-        guard let event = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: false) else { return }
+        let source = markedSource()
+        guard let event = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: false) else { return }
         event.post(tap: .cghidEventTap)
     }
 }

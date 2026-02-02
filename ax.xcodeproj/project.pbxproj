@@ -19,11 +19,17 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		032D35D82F304B9700182E1B /* axlockd.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = axlockd.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		03320F5F2F2FAF6500E551FE /* ax */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = ax; sourceTree = BUILT_PRODUCTS_DIR; };
 		03320FC62F300AD500E551FE /* axtest.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = axtest.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		032D35D92F304B9700182E1B /* axlockd */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = axlockd;
+			sourceTree = "<group>";
+		};
 		03320F612F2FAF6500E551FE /* ax */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = ax;
@@ -37,6 +43,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		032D35D52F304B9700182E1B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		03320F5C2F2FAF6500E551FE /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -59,6 +72,7 @@
 			children = (
 				03320F612F2FAF6500E551FE /* ax */,
 				03320FC72F300AD500E551FE /* axtest */,
+				032D35D92F304B9700182E1B /* axlockd */,
 				03320F602F2FAF6500E551FE /* Products */,
 			);
 			sourceTree = "<group>";
@@ -68,6 +82,7 @@
 			children = (
 				03320F5F2F2FAF6500E551FE /* ax */,
 				03320FC62F300AD500E551FE /* axtest.app */,
+				032D35D82F304B9700182E1B /* axlockd.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -75,6 +90,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		032D35D72F304B9700182E1B /* axlockd */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 032D35E22F304B9800182E1B /* Build configuration list for PBXNativeTarget "axlockd" */;
+			buildPhases = (
+				032D35D42F304B9700182E1B /* Sources */,
+				032D35D52F304B9700182E1B /* Frameworks */,
+				032D35D62F304B9700182E1B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				032D35D92F304B9700182E1B /* axlockd */,
+			);
+			name = axlockd;
+			packageProductDependencies = (
+			);
+			productName = axlockd;
+			productReference = 032D35D82F304B9700182E1B /* axlockd.app */;
+			productType = "com.apple.product-type.application";
+		};
 		03320F5E2F2FAF6500E551FE /* ax */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 03320F662F2FAF6500E551FE /* Build configuration list for PBXNativeTarget "ax" */;
@@ -129,6 +166,9 @@
 				LastSwiftUpdateCheck = 2620;
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
+					032D35D72F304B9700182E1B = {
+						CreatedOnToolsVersion = 26.2;
+					};
 					03320F5E2F2FAF6500E551FE = {
 						CreatedOnToolsVersion = 26.2;
 					};
@@ -153,11 +193,19 @@
 			targets = (
 				03320F5E2F2FAF6500E551FE /* ax */,
 				03320FC52F300AD500E551FE /* axtest */,
+				032D35D72F304B9700182E1B /* axlockd */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		032D35D62F304B9700182E1B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		03320FC42F300AD500E551FE /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -168,6 +216,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		032D35D42F304B9700182E1B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		03320F5B2F2FAF6500E551FE /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -185,6 +240,70 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
+		032D35E02F304B9800182E1B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K9F99M9Q6T;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.joshuaeckstein.axlockd;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		032D35E12F304B9800182E1B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K9F99M9Q6T;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.joshuaeckstein.axlockd;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 		03320F642F2FAF6500E551FE /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -340,7 +459,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = K9F99M9Q6T;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
@@ -372,7 +491,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = K9F99M9Q6T;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
@@ -398,6 +517,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		032D35E22F304B9800182E1B /* Build configuration list for PBXNativeTarget "axlockd" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				032D35E02F304B9800182E1B /* Debug */,
+				032D35E12F304B9800182E1B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		03320F5A2F2FAF6500E551FE /* Build configuration list for PBXProject "ax" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
