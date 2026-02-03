@@ -790,3 +790,71 @@ Potential improvements not yet implemented:
 2. **Watch mode** - Monitor element changes
 3. **Element search** - Find by role/title across tree
 4. **Multi-app element at point** - Check all apps, not just frontmost
+
+## Homebrew Distribution
+
+### Installation
+
+```bash
+brew tap synthemesc/ax
+brew install ax
+```
+
+### Repositories
+
+- **Main repo:** https://github.com/synthemesc/ax
+- **Homebrew tap:** https://github.com/synthemesc/homebrew-ax
+
+### Compile-Time Configuration
+
+The `ax` binary needs to know where `axlockd.app` is installed. This is handled via a C bridging header:
+
+**Files:**
+- `ax/Config.h` - Defines `AXLOCKD_PATH` (defaults to `NULL` for development builds)
+- `ax/ax-Bridging-Header.h` - Exposes the C config to Swift
+
+**How it works:**
+- Development builds: `AXLOCKD_PATH` is `NULL`, so `LockCommand.swift` uses relative path lookup
+- Homebrew builds: Pass `-DAXLOCKD_PATH_VALUE='"/path/to/axlockd"'` via `OTHER_CFLAGS`
+
+**Example:**
+```bash
+# Build with custom axlockd path (what Homebrew does)
+xcodebuild build -scheme ax -configuration Release \
+  "OTHER_CFLAGS=-DAXLOCKD_PATH_VALUE='\"/usr/local/libexec/axlockd.app/Contents/MacOS/axlockd\"'"
+```
+
+### Releasing New Versions
+
+```bash
+# Run the release script
+./scripts/release.sh 1.0.1
+
+# What it does:
+# 1. Runs tests
+# 2. Creates and pushes git tag
+# 3. Fetches SHA256 of the release tarball
+# 4. Updates homebrew-ax formula with new URL and SHA256
+# 5. Commits and pushes formula update
+```
+
+**Manual release (if script fails):**
+```bash
+# Create tag
+git tag -a "v1.0.1" -m "Release 1.0.1"
+git push origin "v1.0.1"
+
+# Get SHA256
+curl -sL "https://github.com/synthemesc/ax/archive/refs/tags/v1.0.1.tar.gz" | shasum -a 256
+
+# Update homebrew-ax/Formula/ax.rb with new url and sha256
+# Commit and push
+```
+
+### Formula Location
+
+Homebrew installs to:
+- `ax` binary: `/usr/local/bin/ax` (or `/opt/homebrew/bin/ax` on Apple Silicon)
+- `axlockd.app`: `/usr/local/libexec/axlockd.app` (or `/opt/homebrew/libexec/axlockd.app`)
+
+The formula configures the axlockd path at compile time so `ax lock` can find it.
