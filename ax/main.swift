@@ -87,6 +87,7 @@ COMMANDS:
     help actions            List accessibility actions
     help attributes         Explain output fields
     help keys               List key names for ax key command
+    help examples           Practical workflow examples
     help --json             Machine-readable documentation
 
 OPTIONS:

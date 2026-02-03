@@ -23,6 +23,7 @@ struct HelpCommand {
         case actions
         case attributes
         case keys
+        case examples
     }
 
     struct HelpArgs {
@@ -51,6 +52,8 @@ struct HelpCommand {
             print(AttributesDoc.text)
         case .keys:
             print(KeysDoc.text)
+        case .examples:
+            print(ExamplesDoc.text)
         }
 
         exit(0)
@@ -62,7 +65,8 @@ struct HelpCommand {
             roles: RolesDoc.entries,
             actions: ActionsDoc.entries,
             attributes: AttributesDoc.entries,
-            keys: KeysDoc.entries
+            keys: KeysDoc.entries,
+            examples: ExamplesDoc.entries
         )
         Output.json(docs)
     }
@@ -75,6 +79,7 @@ struct DocumentationSchema: Encodable {
     let actions: [ActionEntry]
     let attributes: [AttributeEntry]
     let keys: [KeyEntry]
+    let examples: [ExampleEntry]
 }
 
 struct RoleEntry: Encodable {
