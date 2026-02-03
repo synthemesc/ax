@@ -1,9 +1,44 @@
-# Xcode user data
-ax.xcodeproj/xcuserdata/
+# Claude Code
+.claude/*.local.json
 
-# Build products
+# Xcode
+## User settings
+xcuserdata/
+
+## Build products
 build/
 DerivedData/
 
+## Obj-C/Swift specific
+*.hmap
+
+## App packaging
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+## Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
 # macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Thumbnails
+Icon?
+
+# Files that might appear in the root of a volume
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
