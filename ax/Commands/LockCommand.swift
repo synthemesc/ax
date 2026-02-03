@@ -88,6 +88,15 @@ struct LockCommand {
 
     /// Find the path to axlockd binary
     private static func findAxlockdPath() -> String? {
+        // Check compile-time configured path first (for Homebrew installs)
+        if let ptr = AXLOCKD_PATH {
+            let path = String(cString: ptr)
+            if FileManager.default.fileExists(atPath: path) {
+                return path
+            }
+        }
+
+        // Fallback: relative path lookup (for development builds)
         // Get the path to the current executable
         let executablePath = CommandLine.arguments[0]
         let executableURL = URL(fileURLWithPath: executablePath).standardized
