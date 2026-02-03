@@ -199,6 +199,18 @@ ax help keys         # List key names for ax key
 ax help --json       # Machine-readable documentation
 ```
 
+## See Also
+
+| Tool | Language | Primary Purpose | Read Tree | Control Actions | Screenshots | Input Lock | JSON Output |
+|------|----------|-----------------|-----------|-----------------|-------------|------------|-------------|
+| **[ax](https://github.com/synthemesc/ax)** | Swift | AI agents & automation | ✅ | ✅ | ✅ | ✅ | ✅ |
+| [cliclick](https://github.com/BlueM/cliclick) | Objective-C | Mouse/keyboard input | ❌ | ✅ | ❌ | ❌ | ❌ |
+| [macapptree](https://github.com/MacPaw/macapptree) | Python | Tree extraction | ✅ | ❌ | ✅ | ❌ | ✅ |
+| [pyax](https://github.com/eeejay/pyax) | Python | A11y debugging | ✅ | ❌ | ❌ | ❌ | ✅ |
+| [atomacos](https://github.com/daveenguyen/atomacos) | Python | GUI testing | ✅ | ✅ | ❌ | ❌ | ❌ |
+| [ax_dump_tree](https://www.chromium.org/developers/accessibility/testing/automated-testing/ax-inspect/) | C++ | Browser a11y testing | ✅ | ❌ | ❌ | ❌ | ❌ |
+| [Accessibility Inspector](https://developer.apple.com/documentation/accessibility/accessibility-inspector) | GUI | Manual debugging | ✅ | ✅ | ❌ | ❌ | ❌ |
+
 ## License
 
 MIT
