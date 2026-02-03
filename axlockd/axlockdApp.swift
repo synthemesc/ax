@@ -6,6 +6,11 @@
 //  events to pass through. Shows visual overlay and provides triple-Escape
 //  escape hatch.
 //
+//  IMPORTANT: Requires macOS 15.0+
+//  On macOS 14, SwiftUI/AppKit windows don't properly expose their content to
+//  the accessibility tree. This affects the overlay's status label accessibility.
+//  The issue was fixed in macOS 15.
+//
 //  Arguments:
 //    --timeout N      Timeout in seconds (default 60, max 300)
 //    --ipc-file PATH  File path to write window ID to (for parent process)
@@ -19,6 +24,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var eventTap: EventTap!
     private var overlayManager: OverlayManager!
+    private var socketListener: SocketListener!
     private var timeoutTimer: DispatchSourceTimer?
     private var ipcFile: String?
 
@@ -57,6 +63,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Create overlay windows
         overlayManager = OverlayManager()
         let windowIds = overlayManager.createOverlays()
+
+        // Start socket listener for command notifications
+        socketListener = SocketListener()
+        socketListener.onMessage = { [weak self] description in
+            self?.overlayManager.updateStatus(description)
+        }
+        socketListener.start()
 
         // Write the first window ID to IPC file for the parent process
         if let ipcFile = ipcFile, let firstWindowId = windowIds.first {
@@ -104,6 +117,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Cancel timeout timer
         timeoutTimer?.cancel()
         timeoutTimer = nil
+
+        // Stop socket listener
+        socketListener?.stop()
 
         // Stop the event tap
         eventTap?.stop()

@@ -5,6 +5,11 @@
 //  Semi-transparent overlay window that provides visual feedback
 //  when input is locked. One window per screen, ignores mouse events.
 //
+//  NOTE: The statusLabel uses setAccessibilityIdentifier("ax_lock_status") and
+//  setAccessibilityValue() for dynamic updates. This requires macOS 15.0+ to
+//  work reliably - on macOS 14, window content isn't properly exposed to the
+//  accessibility tree.
+//
 
 import AppKit
 
@@ -12,6 +17,7 @@ import AppKit
 class OverlayWindow: NSWindow {
 
     private var titleLabel: NSTextField!
+    private var statusLabel: NSTextField!
     private var subtitleLabel: NSTextField!
     private var pulseTimer: Timer?
 
@@ -54,6 +60,16 @@ class OverlayWindow: NSWindow {
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(titleLabel)
 
+        // Status label (shows current command)
+        statusLabel = NSTextField(labelWithString: "waiting for commands...")
+        statusLabel.font = NSFont.systemFont(ofSize: 24, weight: .regular)
+        statusLabel.textColor = .white
+        statusLabel.alignment = .center
+        statusLabel.lineBreakMode = .byTruncatingTail
+        statusLabel.translatesAutoresizingMaskIntoConstraints = false
+        statusLabel.setAccessibilityIdentifier("ax_lock_status")
+        container.addSubview(statusLabel)
+
         // Subtitle label
         subtitleLabel = NSTextField(labelWithString: "Triple-press Escape to cancel")
         subtitleLabel.font = NSFont.systemFont(ofSize: 18, weight: .regular)
@@ -62,14 +78,36 @@ class OverlayWindow: NSWindow {
         subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(subtitleLabel)
 
-        // Center the labels
+        // Layout constraints
         NSLayoutConstraint.activate([
+            // Title above center
             titleLabel.centerXAnchor.constraint(equalTo: container.centerXAnchor),
-            titleLabel.centerYAnchor.constraint(equalTo: container.centerYAnchor, constant: -20),
+            titleLabel.centerYAnchor.constraint(equalTo: container.centerYAnchor, constant: -40),
 
+            // Status below title
+            statusLabel.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            statusLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 16),
+            statusLabel.leadingAnchor.constraint(greaterThanOrEqualTo: container.leadingAnchor, constant: 40),
+            statusLabel.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: -40),
+
+            // Subtitle below status
             subtitleLabel.centerXAnchor.constraint(equalTo: container.centerXAnchor),
-            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 16)
+            subtitleLabel.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 16)
         ])
+    }
+
+    /// Update the status text displayed below the title.
+    /// - Parameter text: The status text to display (e.g., "clicking at 500, 400")
+    func updateStatus(_ text: String) {
+        statusLabel.stringValue = text
+        statusLabel.setAccessibilityValue(text)
+        // Force layout refresh
+        statusLabel.invalidateIntrinsicContentSize()
+        statusLabel.needsDisplay = true
+        statusLabel.superview?.needsLayout = true
+        statusLabel.superview?.layoutSubtreeIfNeeded()
+        // Notify accessibility that the value changed
+        NSAccessibility.post(element: statusLabel as Any, notification: .valueChanged)
     }
 
     private func startPulseAnimation() {
@@ -138,5 +176,13 @@ class OverlayManager {
             window.close()
         }
         windows.removeAll()
+    }
+
+    /// Update the status text on all overlay windows.
+    /// - Parameter text: The status text to display
+    func updateStatus(_ text: String) {
+        for window in windows {
+            window.updateStatus(text)
+        }
     }
 }

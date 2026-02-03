@@ -50,6 +50,14 @@ struct LockCommand {
             "--ipc-file", ipcFile
         ]
 
+        // Redirect stdin/stdout/stderr to /dev/null so the daemon doesn't inherit
+        // our file descriptors. This prevents issues when ax is run in a
+        // subshell (e.g., `result=$(ax lock)`) - without this, the subshell
+        // would wait for the daemon to exit because it inherits the pipe.
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+
         do {
             try process.run()
         } catch {

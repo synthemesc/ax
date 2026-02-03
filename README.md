@@ -34,7 +34,7 @@ The built executables are in `~/Library/Developer/Xcode/DerivedData/ax-*/Build/P
 
 ## Requirements
 
-- macOS 14.0+
+- macOS 15.0+ (required for reliable SwiftUI accessibility support)
 - **Accessibility permission**: System Settings > Privacy & Security > Accessibility
 - **Screen Recording permission** (for screenshots): System Settings > Privacy & Security > Screen Recording
 

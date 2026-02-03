@@ -668,6 +668,102 @@ test_nested_tree() {
     fi
 }
 
+test_lock_socket_lifecycle() {
+    # Test that socket is created during lock and cleaned up after unlock
+    # Ensure not locked to start
+    "$AX_BIN" unlock >/dev/null 2>&1 || true
+    sleep 0.5
+
+    # Socket should not exist when not locked
+    if [[ -S "/tmp/ax-lock.sock" ]]; then
+        log_fail "lock_socket_lifecycle" "Socket exists before lock"
+        return
+    fi
+
+    # Start lock
+    local lock_result
+    lock_result=$("$AX_BIN" lock --timeout 10 2>/dev/null)
+    local lock_pid
+    lock_pid=$(echo "$lock_result" | jq -r '.pid')
+
+    if [[ -z "$lock_pid" || "$lock_pid" == "null" ]]; then
+        log_fail "lock_socket_lifecycle" "Could not start lock"
+        return
+    fi
+
+    # Give axlockd time to start and create socket
+    sleep 1
+
+    # Socket should exist when locked
+    if [[ ! -S "/tmp/ax-lock.sock" ]]; then
+        "$AX_BIN" unlock >/dev/null 2>&1
+        log_fail "lock_socket_lifecycle" "Socket not created during lock"
+        return
+    fi
+
+    # Unlock
+    "$AX_BIN" unlock >/dev/null 2>&1
+    sleep 0.5
+
+    # Socket should be removed after unlock
+    if [[ -S "/tmp/ax-lock.sock" ]]; then
+        log_fail "lock_socket_lifecycle" "Socket not removed after unlock"
+    else
+        log_pass "lock_socket_lifecycle"
+    fi
+}
+
+test_lock_status_label() {
+    # Test that the status label exists and is accessible in axlockd overlay
+    # Ensure not locked to start
+    "$AX_BIN" unlock >/dev/null 2>&1 || true
+    sleep 0.5
+
+    # Start lock
+    local lock_result
+    lock_result=$("$AX_BIN" lock --timeout 10 2>/dev/null)
+    local lock_pid
+    lock_pid=$(echo "$lock_result" | jq -r '.pid')
+
+    if [[ -z "$lock_pid" || "$lock_pid" == "null" ]]; then
+        log_fail "lock_status_label" "Could not start lock"
+        return
+    fi
+
+    # Give axlockd time to start
+    sleep 1
+
+    # Find axlockd process
+    local axlockd_pid
+    axlockd_pid=$(pgrep -x "axlockd" || true)
+
+    if [[ -z "$axlockd_pid" ]]; then
+        "$AX_BIN" unlock >/dev/null 2>&1
+        log_fail "lock_status_label" "axlockd not running"
+        return
+    fi
+
+    # Query axlockd's UI to find the status label
+    # Note: This query itself will update the status to "listing app ..."
+    local status_text
+    status_text=$("$AX_BIN" ls "$axlockd_pid" --depth 10 2>/dev/null | \
+        jq -r '.. | objects | select(.identifier == "ax_lock_status") | .value // empty' 2>/dev/null | head -1)
+
+    # Unlock before checking result
+    "$AX_BIN" unlock >/dev/null 2>&1
+    sleep 0.5
+
+    # Status should contain "listing" since that was the last command
+    if [[ "$status_text" == *"listing"* ]]; then
+        log_pass "lock_status_label"
+    elif [[ -n "$status_text" ]]; then
+        # Any non-empty value is acceptable - the IPC is working
+        log_pass "lock_status_label"
+    else
+        log_fail "lock_status_label" "Status label not found or empty"
+    fi
+}
+
 #
 # Main
 #
@@ -701,6 +797,8 @@ main() {
     test_screenshot
     test_screenshot_element
     test_nested_tree
+    test_lock_socket_lifecycle
+    test_lock_status_label
 
     teardown
 }

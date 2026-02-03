@@ -251,7 +251,7 @@ axlockd/                        # Separate daemon app for input locking
 
 ## Build Configuration
 
-- **Target:** macOS 26.2+, Swift 5.0
+- **Target:** macOS 15.0+, Swift 5.0
 - **Dependencies:** No external packages (Foundation, AppKit, CoreGraphics, ScreenCaptureKit only)
 - Hardened runtime enabled
 - Strict compiler warnings enabled

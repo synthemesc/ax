@@ -140,6 +140,10 @@ func main() {
     do {
         let command = try CommandParser.parse(CommandLine.arguments)
 
+        // Notify axlockd of command (fire-and-forget, silent on failure)
+        let (cmdName, description) = CommandDescriber.describe(command)
+        LockNotifier.notify(command: cmdName, description: description)
+
         switch command {
         case .help(let args):
             if args.json || args.topic != nil {
