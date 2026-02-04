@@ -1,6 +1,8 @@
 # ax
 
-A macOS command-line tool that exposes the accessibility tree as JSON for AI agents.
+`ax` is a command-line tool for using the macOS GUI programmatically. It combines AXUIElement, ScreenCaptureKit, and Core Graphics APIs to read the view hierarchy, capture screenshots at any level (display, window, or element), and simulate user input.
+
+While useful for general UI automation, its primary goal is letting terminal-based AI tools (like Claude Code) see and control the Mac's windowed interface.
 
 ## Features
 
