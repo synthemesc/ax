@@ -815,14 +815,24 @@ The `ax` binary needs to know where `axlockd.app` is installed. This is handled 
 
 **How it works:**
 - Development builds: `AXLOCKD_PATH` is `NULL`, so `LockCommand.swift` uses relative path lookup
-- Homebrew builds: Pass `-DAXLOCKD_PATH_VALUE='"/path/to/axlockd"'` via `OTHER_CFLAGS`
+- Homebrew builds: Pass `AXLOCKD_PATH_VALUE` via `GCC_PREPROCESSOR_DEFINITIONS`
 
-**Example:**
+**Homebrew Build Settings:**
+
+The formula uses these xcodebuild settings to build without requiring the developer's Team ID:
+
 ```bash
-# Build with custom axlockd path (what Homebrew does)
 xcodebuild build -scheme ax -configuration Release \
-  "OTHER_CFLAGS=-DAXLOCKD_PATH_VALUE='\"/usr/local/libexec/axlockd.app/Contents/MacOS/axlockd\"'"
+  "CODE_SIGN_IDENTITY=-" \
+  "CODE_SIGN_STYLE=Manual" \
+  "CODE_SIGNING_REQUIRED=NO" \
+  "CODE_SIGNING_ALLOWED=NO" \
+  "GCC_PREPROCESSOR_DEFINITIONS=AXLOCKD_PATH_VALUE=\"/opt/homebrew/Cellar/ax/VERSION/libexec/axlockd.app/Contents/MacOS/axlockd\""
 ```
+
+- `CODE_SIGN_STYLE=Manual` - Required to override "Automatic" signing in the project
+- `CODE_SIGN_IDENTITY=-` - Ad-hoc signing (no certificate needed)
+- `GCC_PREPROCESSOR_DEFINITIONS` - Passes the axlockd path to Config.h via the bridging header
 
 ### Releasing New Versions
 
